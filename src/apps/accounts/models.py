@@ -3,7 +3,7 @@
 Scope note -- `architecture.md` §3 assigns more to `accounts` (IdP mirror,
 group->role mapping, notification preferences) and splits profile data into a
 separate `people` context. This module implements the slice needed to run the
-signup -> trainer-approval -> login loop; the remaining pieces stay out rather
+signup -> admin-approval -> login loop; the remaining pieces stay out rather
 than being half-modelled.
 """
 
@@ -22,6 +22,7 @@ from apps.accounts.domain.enums import (
     ApprovalStatus,
     AuthSource,
     InvalidTransition,
+    RequestedRole,
     assert_transition,
 )
 from apps.common.models import TimeStampedModel, UUIDModel
@@ -135,8 +136,9 @@ class User(UUIDModel, AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     )
     decided_at = models.DateTimeField(null=True, blank=True)
 
-    #: Trainee picked this trainer as their approver. Only this trainer is
-    #: notified and only this trainer may approve (see `policies.can_approve`).
+    #: Deprecated: approval is an Admin act now, so an applicant's chosen trainer
+    #: no longer decides anything. The column is kept so the historical record of
+    #: who was nominated still exists; nothing writes it any more.
     selected_trainer = models.ForeignKey(
         "self",
         null=True,
@@ -148,10 +150,6 @@ class User(UUIDModel, AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     #: IdP mirror (§3: `accounts` holds the IdP mirror).
     oidc_subject = models.CharField(max_length=255, blank=True, default="")
     ldap_dn = models.CharField(max_length=512, blank=True, default="")
-
-    #: Seeded accounts get a predictable password; force a real one before the
-    #: account is useful.
-    must_change_password = models.BooleanField(default=False)
 
     is_active = models.BooleanField(default=True)
     #: Staff is "can log into the Django admin", NOT "is an LMS trainer".
@@ -175,14 +173,43 @@ class User(UUIDModel, AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     def __str__(self) -> str:
         return f"{self.full_name} <{self.email}>"
 
+    # -- presentation -----------------------------------------------------
+
+    @property
+    def initials(self) -> str:
+        """One or two letters for the avatar in the masthead.
+
+        Derived from `full_name` rather than stored. Splitting a first name from
+        a last name would mean two more columns, a migration and a backfill, to
+        hold data the model already has.
+
+        A single-word name gives one letter rather than a doubled one, and a
+        name that is blank or only whitespace falls back to the email, which is
+        the one field that is guaranteed present and unique.
+        """
+        words = self.full_name.split()
+        if not words:
+            return (self.email or "?")[0].upper()
+        letters = [words[0][0], words[-1][0]] if len(words) > 1 else [words[0][0]]
+        return "".join(letters).upper()
+
     # -- approval state ---------------------------------------------------
 
     @property
     def is_approved(self) -> bool:
         return self.approval_status in ACTIVE_STATUSES
 
-    def move_to(self, target: ApprovalStatus, *, by: "User | None" = None) -> None:
-        """Apply an approval transition, validating the state machine."""
+    def move_to(self, target: ApprovalStatus, *, by: User | None = None) -> None:
+        """Apply an approval transition, validating the state machine.
+
+        **`is_active` is derived here, not set by the caller.** `prd.md` §5.1
+        requires a pending account to fail authentication on *every* backend, and
+        the only thing Django's `ModelBackend` consults is `is_active`. So leaving
+        it to each caller to remember meant two bugs at once: signup created an
+        active pending user, and an approval re-activated nothing. Deriving it
+        from `ACTIVE_STATUSES` here means there is one place that knows what
+        "inert" means, and it cannot disagree with `is_approved`.
+        """
         current = ApprovalStatus(self.approval_status)
         target = ApprovalStatus(target)
         assert_transition(current, target)
@@ -190,8 +217,15 @@ class User(UUIDModel, AbstractBaseUser, PermissionsMixin, TimeStampedModel):
             self.decided_at = timezone.now()
             self.decided_by = by
         self.approval_status = target
+        self.is_active = target in ACTIVE_STATUSES
         self.save(
-            update_fields=["approval_status", "decided_at", "decided_by", "updated_at"]
+            update_fields=[
+                "approval_status",
+                "is_active",
+                "decided_at",
+                "decided_by",
+                "updated_at",
+            ]
         )
 
     # -- roles ------------------------------------------------------------
@@ -206,6 +240,23 @@ class User(UUIDModel, AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         Views must call `policies.*`; §7 forbids scattering this check.
         """
         return self.has_role(ROLE_TRAINER) or self.has_role(ROLE_ADMIN)
+
+    @property
+    def is_admin(self) -> bool:
+        """Template-facing convenience. `is_trainer` above has the same caveat.
+
+        Django template tags cannot call a method with an argument -- `{% if
+        user.has_role "admin" %}` is a syntax error, not a silent false -- so the
+        nav cannot ask the question in the shape `has_role` wants it. This is the
+        property that lets it.
+
+        `is_superuser` is folded in for the same reason `policies.is_admin` folds
+        it in: `createsuperuser` grants no RoleAssignment, so without this the
+        person on call sees no Approvals link even though `policies.is_admin` would
+        admit them to the queue. A link that hides a page you are allowed to open
+        is a smaller bug than the inverse, but it is still a bug.
+        """
+        return self.has_role(ROLE_ADMIN) or self.is_superuser
 
 
 class RoleAssignment(UUIDModel, TimeStampedModel):
@@ -240,12 +291,23 @@ class SignupRequest(UUIDModel, TimeStampedModel):
 
     full_name = models.CharField(max_length=255)
     email = models.EmailField()
+    #: Deprecated: approval is an Admin act, so a nominated trainer no longer
+    #: decides anything. The column is kept so the historical nomination survives;
+    #: nothing writes it any more. See `requested_role` for what actually routes
+    #: an application.
     selected_trainer = models.ForeignKey(
         User,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="signup_requests",
+    )
+    requested_role = models.CharField(
+        max_length=16,
+        choices=[(r.value, r.value.capitalize()) for r in RequestedRole],
+        default=RequestedRole.TRAINEE,
+        db_index=True,
+        help_text="Role the applicant asked for. Admin cannot be requested.",
     )
     status = models.CharField(
         max_length=10,
@@ -269,6 +331,17 @@ class SignupRequest(UUIDModel, TimeStampedModel):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="signup_request",
+    )
+    #: Who filled the form in. Null for self-registration, set when a Trainer or
+    #: Admin created the account for somebody else, so "an admin approved this" can
+    #: be read alongside "a trainer entered it". Previously this existed only as a
+    #: log field, which meant it was lost the moment the logs rotated.
+    created_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="applications_entered",
     )
 
     class Meta:
@@ -302,7 +375,7 @@ class SignupRequest(UUIDModel, TimeStampedModel):
         return f"{self.email} ({self.status})"
 
     @classmethod
-    def blocking_for_email(cls, email: str) -> "SignupRequest | None":
+    def blocking_for_email(cls, email: str) -> SignupRequest | None:
         """The application currently preventing this address from applying again.
 
         Load-bearing now that `uniq_signup_email_open` excludes REDIRECTED rows:
@@ -371,6 +444,14 @@ class ApprovalUndoToken(TimeStampedModel):
 
     Rows are never deleted on use. ``consumed_at`` is the audit trail, and the
     request it points at records what was undone and on whose authority.
+
+    ``emailed_at`` is set by the mail task once the message has been accepted by
+    the SMTP server, and it exists because "queued" and "sent" are not the same
+    thing. ``.delay()`` returns as soon as the broker has the message, so a
+    dialog that reported success on that return would claim a code is on its way
+    when the worker has not even heard of the task yet -- which is exactly what
+    happened while the worker was running code from before these tasks existed.
+    The dialog waits on this field instead.
     """
 
     request = models.ForeignKey(
@@ -388,6 +469,7 @@ class ApprovalUndoToken(TimeStampedModel):
     expires_at = models.DateTimeField()
     attempts = models.PositiveSmallIntegerField(default=0)
     consumed_at = models.DateTimeField(null=True, blank=True)
+    emailed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ("-created_at",)
@@ -415,13 +497,13 @@ __all__ = [
     "APPROVAL_UNDO_LIFETIME",
     "APPROVAL_UNDO_LIFETIME_MINUTES",
     "APPROVAL_UNDO_MAX_ATTEMPTS",
+    "ROLE_ADMIN",
+    "ROLE_TRAINEE",
+    "ROLE_TRAINER",
     "ApprovalUndoToken",
     "InvalidTransition",
     "Role",
     "RoleAssignment",
-    "ROLE_ADMIN",
-    "ROLE_TRAINEE",
-    "ROLE_TRAINER",
     "SignupRequest",
     "User",
     "UserManager",

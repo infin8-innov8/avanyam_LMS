@@ -29,6 +29,24 @@ class AuthSource(StrEnum):
     LOCAL = "local"
 
 
+class RequestedRole(StrEnum):
+    """The role an applicant asks for at signup.
+
+    Admin is structurally absent. `rules.md` §2.2 requires that a self-signup can
+    never yield ADMIN, enforced by a validator over this enum rather than by
+    hiding a field: a form that merely omits the option is one POST away from
+    offering it again.
+    """
+
+    TRAINEE = "trainee"
+    TRAINER = "trainer"
+
+
+#: The only roles an application may request. `ADMIN` is absent by construction
+#: -- admins are created only by `manage.py createadmin`, never by signup.
+REQUESTABLE_ROLES: frozenset[RequestedRole] = frozenset(RequestedRole)
+
+
 class ApprovalStatus(StrEnum):
     """Account lifecycle. §6.2."""
 
@@ -39,10 +57,11 @@ class ApprovalStatus(StrEnum):
 
     #: A decline that is *not* a rejection.
     #:
-    #: A trainer picks this when the applicant simply chose the wrong trainer --
-    #: wrong discipline, wrong region, the wrong person. It ends this application
-    #: but leaves the address free to apply again, which is the whole difference
-    #: from REJECTED and the reason it is a separate state rather than a flag.
+    #: An admin picks this when the application looks premature or was filled in
+    #: wrongly -- a trainee who put trainer in the requested-role box, say. It ends
+    #: this application but leaves the address free to apply again, which is the
+    #: whole difference from REJECTED and the reason it is a separate state rather
+    #: than a flag.
     #:
     #: It applies to a SignupRequest. A User never sits in this state: a redirected
     #: applicant has no usable account, so the pending stub is removed and the
@@ -72,18 +91,17 @@ BLOCKING_STATUSES = frozenset(
 #: account is a distinct administrative act with an audit trail, not a
 #: side-effect of an approval click.
 #:
-#: ``rejected -> pending`` was also terminal once. It is now permitted, because a
-#: trainer who rejected the wrong person had no way to put it right. It is not
-#: reachable by a plain status write: `service.approval.undo_rejection()` is the
-#: only caller, it requires a single-use OTP mailed to the trainer, and it leaves
-#: the rejection on record. The state machine expresses that the move is legal,
-#: not that it is easy -- the same way ``approved -> suspended`` is legal but
+#: ``rejected -> pending`` was also terminal once. It is now permitted, because an
+#: admin who rejected the wrong person had no way to put it right. It is not
+#: reachable by a plain status write: `service.undo.undo_rejection()` is the only
+#: caller, it requires a single-use OTP mailed to the admin, and it leaves the
+#: rejection on record. The state machine expresses that the move is legal, not
+#: that it is easy -- the same way ``approved -> suspended`` is legal but
 #: administrative.
 #:
 #: ``redirected`` is terminal. The applicant may apply again, but that is a *new*
-#: SignupRequest row against a new trainer, not a revival of this one; letting it
-#: return to pending would resurrect an application whose whole premise (the
-#: chosen trainer) was wrong.
+#: SignupRequest row, not a revival of this one; letting it return to pending would
+#: resurrect an application whose premise was wrong.
 TRANSITIONS: dict[ApprovalStatus, frozenset[ApprovalStatus]] = {
     ApprovalStatus.PENDING: frozenset(
         {
