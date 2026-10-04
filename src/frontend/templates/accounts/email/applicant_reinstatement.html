@@ -8,13 +8,12 @@
     <h1 style="font-size:24px;margin:0 0 16px">Your rejection was reversed</h1>
     <p style="margin:0 0 16px">Hello {{ request.full_name }},</p>
     <p style="margin:0 0 16px">
-      {{ trainer.full_name|default:"An administrator" }} reversed the decision on
+      {{ admin.full_name|default:"An administrator" }} reversed the decision on
       your Avanyam LMS application.
     </p>
     <p style="margin:0 0 20px">
-      It is back in the approval queue with the same trainer. You do not need to
-      register again and your previous password still works. You will be told as
-      soon as it is decided.
+      It is back in the approval queue. You do not need to register again and your
+      previous password still works. You will be told as soon as it is decided.
     </p>
     <p style="margin:0 0 16px">
       <a href="{{ queue_url }}" style="display:inline-block;background:#c25e08;color:#fff;

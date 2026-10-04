@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% comment %}
-  The undo flow for trainers without JavaScript.
+  The undo flow for admins without JavaScript.
 
   It exists because the queue row carries a single button and nothing else. Two
   controls on one row -- "Undo decline" beside a permanently visible code box --
@@ -36,7 +36,8 @@
                inputmode="numeric" autocomplete="one-time-code"
                pattern="[0-9]{6}" maxlength="6" placeholder="000000" required>
         <p class="hint">
-          Sent to {{ request.user.email }}. Valid for {{ minutes }} minutes.
+          Sent to {{ request.user.email }}. Valid for {{ minutes_left }} more
+          minute{{ minutes_left|pluralize }}.
         </p>
       </div>
       <button class="btn btn--undo btn--block" type="submit">Undo decline</button>
@@ -49,7 +50,7 @@
   {% endif %}
 
   <p class="muted">
-    <a href="{% url 'accounts:trainer-queue' %}?filter=rejected">Back to declined</a>
+    <a href="{% url 'accounts:admin-queue' %}?filter=rejected">Back to declined</a>
   </p>
 </div>
 {% endblock %}

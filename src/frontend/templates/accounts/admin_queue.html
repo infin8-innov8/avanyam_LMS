@@ -2,19 +2,24 @@
 {% block title %}Approvals &middot; Avanyam LMS{% endblock %}
 
 {% comment %}
-  The approval screen. This is the whole point of the page: a trainer opens it to
-  make a decision, so the default view is the pending queue and nothing else.
+  The approval screen, and the whole reason an admin has one. Every admin sees the
+  same queue: there is no per-trainer split any more (D41), so there is nothing on
+  this page to filter by and no row that is "mine" rather than "yours".
 
-  Two deliberate choices:
+  Three deliberate choices:
 
   * Status tabs instead of one long list. "Pending" is what needs action;
     approved and declined are history you occasionally want to check, not
     scroll past. The counts come from the view over the same rows that are
     rendered, so a tab can never claim "3 pending" above a list of five.
-  * The note field sits inside the decision form rather than in a modal. A
-    dialog would have to trap keyboard users to be dismissable, and the thing
-    being confirmed -- declining someone's registration, permanently blocking
-    that email -- deserves to be visible in the page, not behind a click.
+  * The role control sits in the decision form, above the buttons, and defaults
+    to what the applicant asked for. It is not a separate action because it is
+    not one: approving with a different role is still one approval, and it is
+    recorded as an override on the same row.
+  * The note field is here rather than in a modal. A dialog would have to trap
+    keyboard users to be dismissable, and the thing being confirmed -- declining
+    someone's registration and permanently blocking that address -- deserves to be
+    visible in the page, not behind a click.
 {% endcomment %}
 
 {% block content %}
@@ -25,11 +30,11 @@
     <h1>Registration requests</h1>
     <p class="lede" style="margin-bottom:0">
       {% if counts.pending %}
-        {{ counts.pending }} trainee{{ counts.pending|pluralize }} waiting on your decision.
-        Approving unlocks the account and emails the trainee; declining keeps the
+        {{ counts.pending }} application{{ counts.pending|pluralize }} waiting on a decision.
+        Approving unlocks the account and emails the applicant; declining keeps the
         address blocked from registering again.
       {% else %}
-        Nothing is waiting on you. New registrations arrive here and by email.
+        Nothing is waiting. New registrations arrive here and by email.
       {% endif %}
     </p>
   </div>
@@ -60,7 +65,8 @@
               {{ req.email }}
             </div>
             <div class="queue__meta">
-              Requested {{ req.created_at|date:"j M Y, H:i" }}
+              Applied to join as <strong>{{ req.get_requested_role_display }}</strong>
+              &middot; requested {{ req.created_at|date:"j M Y, H:i" }}
               {% if req.decided_at %}
                 &middot; decided {{ req.decided_at|date:"j M Y, H:i" }}
               {% endif %}
@@ -68,6 +74,12 @@
                 &middot; waiting {{ req.waiting_days }} day{{ req.waiting_days|pluralize }}
               {% endif %}
             </div>
+            {% if req.created_by %}
+              <div class="queue__meta">
+                Application entered by <strong>{{ req.created_by.full_name }}</strong>
+                on their behalf.
+              </div>
+            {% endif %}
             {% if req.decision_note %}
               <div class="queue__meta"><strong>Note:</strong> {{ req.decision_note }}</div>
             {% endif %}
@@ -78,13 +90,28 @@
                   action="{% url 'accounts:decide' request_pk=req.pk %}"
                   class="queue__actions">
               {% csrf_token %}
-              <label class="small muted" for="note-{{ req.pk }}">Note to the trainee (optional)</label>
+
+              <div class="queue__role-row">
+                <label for="role-{{ req.pk }}">Grant role</label>
+                <select class="queue__role" id="role-{{ req.pk }}" name="role">
+                  {% for value, label in role_choices %}
+                    <option value="{{ value }}"{% if value == req.requested_role %} selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+                <span class="hint">
+                  Prefilled with what they asked for. Changing it changes the account
+                  they get, and they are emailed telling them which role they received.
+                </span>
+              </div>
+
+              <label class="small muted" for="note-{{ req.pk }}">Note to the applicant (optional)</label>
               <input type="text" id="note-{{ req.pk }}" name="note"
-                     placeholder="e.g. reporting to the wrong trainer">
+                     placeholder="e.g. applied to join as a trainer">
+
               <div class="queue__buttons">
                 {% comment %}
                   The prompt lives on the button, not the form. It used to sit on
-                  the form, which meant clicking Approve asked the trainer to
+                  the form, which meant clicking Approve asked the admin to
                   confirm a *decline* -- reported as "both buttons decline".
                   Each button now names its own action, in its own words.
                 {% endcomment %}
@@ -104,7 +131,7 @@
                 </button>
                 <button class="btn btn--reject-soft" type="submit" name="decision" value="redirect"
                         data-confirm="Decline {{ req.full_name|escapejs }} but allow them to re-register?"
-                        data-confirm-body="{{ req.full_name }} will be emailed and invited to apply again, most likely with a different trainer. This does not block the address."
+                        data-confirm-body="{{ req.full_name }} will be emailed and invited to apply again. This does not block the address."
                         data-confirm-label="Allow re-register"
                         data-confirm-tone="reject">
                   Allow re-register
@@ -131,11 +158,12 @@
                         data-code-url="{% url 'accounts:undo-code' request_pk=req.pk %}"
                         data-confirm-url="{% url 'accounts:undo-confirm' request_pk=req.pk %}"
                         data-name="{{ req.full_name }}"
-                        {% if req.code_sent %}data-undo-pending{% endif %}>
+                        data-email="{{ request.user.email }}"
+                        {% if req.code_sent %}data-undo-pending data-seconds-left="{{ req.code_seconds_left }}"{% endif %}>
                   {% if req.code_sent %}Enter the emailed code&hellip;{% else %}Undo decline{% endif %}
                 </button>
-</form>
-              </div>
+              </form>
+            </div>
             {% endif %}
         </li>
       {% endfor %}
@@ -143,14 +171,17 @@
   {% else %}
     <div class="queue__empty">
       {% if selected == "pending" %}
-        <p class="queue__empty-title">Nothing waiting on you.</p>
+        <p class="queue__empty-title">Nothing waiting.</p>
         <p class="muted">New registrations appear here and by email.</p>
       {% elif selected == "approved" %}
-        <p class="queue__empty-title">You have not approved anyone yet.</p>
-        <p class="muted">Approved trainees move to this tab.</p>
+        <p class="queue__empty-title">Nobody approved yet.</p>
+        <p class="muted">Approved applications move to this tab.</p>
+      {% elif selected == "rejected" %}
+        <p class="queue__empty-title">Nothing declined permanently.</p>
+        <p class="muted">Permanently declined applications are kept here for the record.</p>
       {% else %}
-        <p class="queue__empty-title">Nothing declined.</p>
-        <p class="muted">Declined applications are kept here for the record.</p>
+        <p class="queue__empty-title">Nothing here.</p>
+        <p class="muted">No application in this state.</p>
       {% endif %}
     </div>
   {% endif %}

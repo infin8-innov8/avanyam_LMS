@@ -57,6 +57,10 @@ a:hover { color: var(--accent-600); }
   display: flex;
   align-items: center;
   gap: var(--sp-3);
+  /* Wraps on a narrow phone. It was `nowrap`, which pushed the nav 75px past a
+     320px viewport: the wordmark plus "Approvals" and the avatar are wider than
+     the screen, and the avatar ended up off the right edge entirely. */
+  flex-wrap: wrap;
   padding: var(--sp-4) var(--sp-5);
   border-bottom: 1px solid var(--ink-100);
   background: rgba(255, 255, 255, 0.82);
@@ -94,6 +98,119 @@ a:hover { color: var(--accent-600); }
 .masthead nav { margin-left: auto; display: flex; gap: var(--sp-4); align-items: center; }
 .masthead nav a { text-decoration: none; font-weight: 500; }
 .masthead nav a:hover { text-decoration: underline; }
+
+/* ------------------------------------------------------- the account menu */
+
+/* For text a screen reader needs and a sighted visitor must not read, such as
+   the avatar's name. Not `display: none`, which would silence it too. */
+.sr-only {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.usermenu { position: relative; }
+
+/* Transparent and 1px rather than `display: none`, for the same reason the
+   homepage role radios are: hiding the control would take it out of the tab
+   order and strand a keyboard visitor with no way to open the menu. */
+.usermenu__toggle {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 34px;
+  block-size: 34px;
+  border-radius: 50%;
+  background: var(--ink-700);
+  color: #fff;
+  font-size: var(--step--1);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease;
+}
+
+.avatar:hover { background: var(--ink-900); }
+.usermenu__toggle:checked ~ .avatar { background: var(--ink-900); }
+.usermenu__toggle:focus-visible ~ .avatar { box-shadow: var(--ring); }
+
+.usermenu__panel {
+  position: absolute;
+  inset-block-start: calc(100% + var(--sp-3));
+  inset-inline-end: 0;
+  z-index: 20;
+  /* Grows to fit a short name, stops at 260px so a long address cannot turn the
+     dropdown into a 460px banner, and never exceeds the screen. */
+  inline-size: max-content;
+  min-inline-size: 200px;
+  max-inline-size: min(260px, calc(100vw - 2 * var(--sp-5)));
+  padding: var(--sp-4);
+  background: #fff;
+  border: 1px solid var(--ink-100);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-2);
+  /* Faded and lifted rather than `display: none`, so it can open smoothly. The
+     hidden state is unconditional: with motion switched off the panel still has
+     to end up hidden. */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px);
+}
+
+.usermenu__toggle:checked ~ .usermenu__panel {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .usermenu__panel {
+    transition:
+      opacity 0.16s ease,
+      transform 0.16s cubic-bezier(0.22, 0.68, 0.35, 1),
+      visibility 0s linear 0.16s;
+  }
+
+  .usermenu__toggle:checked ~ .usermenu__panel {
+    transition:
+      opacity 0.16s ease,
+      transform 0.16s cubic-bezier(0.22, 0.68, 0.35, 1),
+      visibility 0s;
+  }
+}
+
+.usermenu__name {
+  margin: 0;
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--ink-900);
+  /* A long name must not stretch the panel past the viewport edge. */
+  overflow-wrap: anywhere;
+}
+
+.usermenu__email {
+  margin: 2px 0 var(--sp-4);
+  padding-block-end: var(--sp-3);
+  border-block-end: 1px solid var(--ink-100);
+  font-size: var(--step--2);
+  color: var(--ink-400);
+  overflow-wrap: anywhere;
+}
 
 /* ------------------------------------------------------------------ layout */
 
@@ -336,6 +453,11 @@ select {
   margin: var(--sp-4) 0;
 }
 .panel a { color: var(--accent-400); }
+
+/* An element allowed to take the page's full width. The home page overrides
+   `.shell` through this, because a landing page that stops at 1100px and
+   leaves the background either side of it reads as a form with extra steps. */
+.page { max-width: none; padding: 0; }
 
 .footer {
   padding: var(--sp-5);
@@ -617,6 +739,29 @@ select {
 .queue__buttons { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 .queue__actions input[type="text"] { inline-size: 100%; }
 
+/* The role the account will actually get, sitting above the three decision
+   buttons. It only matters when Approve wins, but it cannot live inside the
+   Approve button -- a button has no subtree -- so it lives with the note field,
+   which is also an input you may ignore. */
+.queue__role {
+  inline-size: 100%;
+}
+.queue__role-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  inline-size: 100%;
+}
+.queue__role-row label {
+  color: var(--ink-600);
+  font-size: var(--step--1);
+}
+/* Prefilled with what the applicant asked for, so an admin who is not overriding
+   sees the value they would have got anyway. The hint says what changing it
+   means, because "override" is a word about authority and the effect that
+   matters is on the person's account. */
+.queue__role-row .hint { color: var(--ink-600); font-size: var(--step--1); }
+
 /* The two undo forms sit side by side on wide screens and stack on narrow ones.
    `flex-wrap` does the responsive part, so there is no breakpoint to keep in
    sync with the queue grid above. */
@@ -737,8 +882,148 @@ select {
   text-align: center;
 }
 
-/* The confirming action is the one the keyboard lands on after Tab from Cancel,
-   so it must not sit flush against the right edge on a narrow screen. */
+/* ------------------------------------------------------------------- undo otp
+
+   A top-centre panel that shares the toasts' position, width, radius, shadow and
+   `toast-in` arrival. It is not a toast -- it must not expire, because it holds
+   the only input for the step -- so it opts out of the drain and dismissal and
+   keeps its own clock instead.
+
+   Deliberately non-modal. The trainer is undoing a row while looking at the list
+   of rows, and a centred dialog hides the list they came from. */
+
+.otp {
+  position: fixed;
+  inset-block-start: var(--sp-4);
+  inset-inline: 0;
+  margin-inline: auto;
+  z-index: 200;
+  width: min(26rem, calc(100vw - 2 * var(--sp-4)));
+  pointer-events: none;
+}
+
+.otp__panel {
+  --undo-tick-ms: 1000;
+  --undo-reopen-ms: 8000;
+  pointer-events: auto;
+  padding: var(--sp-4) var(--sp-5) var(--sp-4);
+  border: 1px solid var(--ink-100);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink-900);
+  box-shadow: var(--shadow-2);
+  text-align: start;
+}
+
+/* Same rise as a toast, so arriving feedback on this page is one motion rather
+   than two. `backwards` matters: without it the panel is visible at its final
+   position for the frame before the animation starts. */
+.js .otp__panel { animation: toast-in 180ms ease-out backwards; }
+
+.otp__eyebrow {
+  margin: 0 0 var(--sp-1);
+  font-size: var(--step--2);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+}
+
+.otp__title {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--step-1);
+  line-height: 1.25;
+}
+
+.otp__body { margin: 0; color: var(--ink-700); font-size: var(--step--1); }
+
+/* Address on the left, clock on the right, on one line: they are both facts about
+   the same code and reading them together is the point. */
+.otp__meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin: var(--sp-4) 0 0;
+  padding-block-end: var(--sp-3);
+  border-block-end: 1px solid var(--ink-100);
+  font-size: var(--step--1);
+  color: var(--ink-700);
+}
+
+/* Tabular numerals, because a proportional "1" is narrower than a "0" and a clock
+   that changes width every second pulls the eye to itself instead of the input. */
+.otp__clock {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ink-900);
+  white-space: nowrap;
+}
+
+/* Under two minutes left the code is close to useless, and says so rather than
+   letting the trainer type six digits into a dead token. */
+.otp__panel.is-urgent .otp__clock { color: var(--bad-600); }
+
+.otp__code { margin-block-start: var(--sp-4); }
+
+.otp__code-label {
+  display: block;
+  margin-block-end: var(--sp-2);
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--ink-700);
+}
+
+.otp__code-input {
+  inline-size: 100%;
+  padding: var(--sp-3);
+  border: 1px solid var(--ink-300);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink-900);
+  font-family: var(--font-mono);
+  font-size: var(--step-0);
+  letter-spacing: 0.35em;
+  text-align: center;
+  text-indent: 0.35em; /* recentre the digits against the trailing letter-space */
+}
+
+.otp__error {
+  margin: var(--sp-3) 0 0;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid #f3c6c2;
+  border-radius: var(--radius);
+  background: var(--bad-100);
+  color: var(--bad-600);
+  font-size: var(--step--1);
+}
+
+.otp__actions {
+  display: flex;
+  gap: var(--sp-3);
+  justify-content: flex-end;
+  margin-block-start: var(--sp-4);
+}
+
+/* The panel is tall enough to cover the top of a short viewport, so on narrow
+   screens it drops to the bottom the way the toasts do and stops overlapping the
+   row the trainer is trying to read. */
+@media (width <= 40rem) {
+  .otp {
+    inset-block: auto var(--sp-4);
+    inset-inline: var(--sp-3);
+    width: auto;
+  }
+  .js .otp__panel { animation-name: toast-in-up; }
+  .otp__actions { flex-direction: column-reverse; }
+  .otp__actions .btn { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .js .otp__panel { animation: none; }
+}
+
 @media (max-width: 30rem) {
   .confirm__actions { flex-direction: column-reverse; }
   .confirm__actions .btn { width: 100%; }
@@ -751,4 +1036,9 @@ select {
 
 @media (prefers-reduced-motion: reduce) {
   .confirm[open] { animation: none; }
+}
+
+/* Bottom-anchored counterpart of `toast-in`, for the narrow-screen placement. */
+@keyframes toast-in-up {
+  from { opacity: 0; transform: translateY(var(--sp-2)); }
 }

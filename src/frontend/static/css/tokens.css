@@ -23,6 +23,7 @@
   --ink-050: #f4f6fa;
 
   /* Accent -- saffron */
+  --accent-800: #7a3a05;
   --accent-700: #9a4a06;
   --accent-600: #c25e08;
   --accent-500: #e2760c;
@@ -42,6 +43,11 @@
   --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
 
+/* Ratio 1.25 per step. --step--2 exists for the uppercase eyebrow labels on the
+   OTP dialog and the queue rows, which need a clear notch under body text
+   without going unreadably small. It was being used before it was defined, which
+   silently left those labels on the browser's fallback size. */
+  --step--2: 0.7rem;
   --step--1: 0.875rem;
   --step-0: 1rem;
   --step-1: 1.25rem;

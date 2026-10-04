@@ -1,0 +1,471 @@
+/* Avanyam public home page.
+ *
+ * Loaded only by pages/home.html, on top of tokens.css + avanyam.css. Same
+ * design system as the portal -- ink surfaces, one saffron accent, the
+ * existing radius scale -- so signing in from this page does not feel like
+ * leaving the product.
+ *
+ * Layout note: base.html wraps `{% block content %}` in `.shell`, which caps
+ * width and pads it. The home page is edge to edge, so `.page` cancels that
+ * and each section lays its own measure out through `.hp-wrap`. One wrapper,
+ * used everywhere, instead of a second set of breakpoints.
+ */
+
+/* ------------------------------------------------------------------- shell */
+
+/* The `.shell` reset itself lives in avanyam.css, next to the width it
+   cancels, rather than here where a reader would not look for it. */
+
+.hp-wrap {
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-inline: var(--sp-5);
+}
+
+/* Anchored sections must clear the sticky bar, or the heading lands under it. */
+.hp-section,
+.hp-close { scroll-margin-top: 4.5rem; }
+
+/* ---------------------------------------------------------------- in-pagenav */
+
+.hp-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgb(255 255 255 / 0.88);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--ink-100);
+}
+
+/* Hidden rather than wrapped on narrow screens: four links that break across
+   two lines under a sticky bar is worse than no bar. The page reads top to
+   bottom perfectly well without it. */
+.hp-nav__inner { display: none; }
+
+@media (min-width: 62rem) {
+  .hp-nav__inner {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-5);
+    min-block-size: 3.25rem;
+  }
+}
+
+.hp-nav a {
+  font-size: var(--step--1);
+  font-weight: 500;
+  color: var(--ink-600);
+  text-decoration: none;
+}
+
+.hp-nav a:hover { color: var(--ink-900); text-decoration: underline; }
+.hp-nav a[aria-current="true"] { color: var(--accent-700); }
+
+/* --------------------------------------------------------------------- hero */
+
+.hp-hero { padding-block: clamp(2.5rem, 6vw, 5rem) clamp(2.5rem, 5vw, 4.5rem); }
+
+.hp-hero__grid {
+  display: grid;
+  gap: clamp(2rem, 4vw, 3.5rem);
+  align-items: center;
+}
+
+@media (min-width: 62rem) {
+  .hp-hero__grid { grid-template-columns: 1.02fr 0.98fr; }
+}
+
+.hp-hero h1 {
+  font-size: clamp(var(--step-3), 2.4vw + 1rem, 3.35rem);
+  margin-bottom: var(--sp-4);
+}
+
+.hp-hero .lede { max-width: 34ch; margin-bottom: var(--sp-5); }
+
+.hp-shot { margin: 0; }
+
+.hp-shot img {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+  border: 1px solid var(--ink-100);
+  border-radius: var(--radius-lg);
+  background: var(--ink-050);
+  box-shadow: var(--shadow-2);
+}
+
+.hp-shot figcaption {
+  margin-block-start: var(--sp-3);
+  font-size: var(--step--1);
+  color: var(--ink-400);
+}
+
+/* --------------------------------------------------------------------- CTAs */
+
+.hp-cta { display: flex; flex-wrap: wrap; gap: var(--sp-3); }
+.hp-cta--center { justify-content: center; }
+
+/* One step darker than `.btn--primary`. White on `--accent-600` lands at about
+   4.3:1, which is under the 4.5:1 threshold for body-size button text, and a
+   landing page CTA is exactly the text that must not be the faintest thing
+   on screen. */
+.btn--cta { background: var(--accent-700); color: #fff; }
+.btn--cta:hover { background: var(--accent-800); color: #fff; }
+
+/* ----------------------------------------------------------------- sections */
+
+.hp-section { padding-block: clamp(3rem, 7vw, 5.5rem); }
+
+/* Tinted band, same neutral family as the page rather than a second theme. */
+.hp-band {
+  background: var(--ink-050);
+  border-block: 1px solid var(--ink-100);
+}
+
+.hp-head { max-width: 46rem; margin-block-end: clamp(2rem, 4vw, 3rem); }
+
+.hp-head h2 {
+  font-size: clamp(var(--step-2), 1.6vw + 0.9rem, var(--step-3));
+  margin-block-end: var(--sp-3);
+}
+
+.hp-head .lede { margin-block-end: 0; }
+
+/* ----------------------------------------------- the problem (four columns) */
+
+/* A saffron rule above each item instead of a card. Four parallel problems
+   read as a list of facts; four identical boxes read as a pricing table. */
+.hp-costs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-5);
+}
+
+@media (min-width: 46rem) {
+  .hp-costs { grid-template-columns: repeat(2, 1fr); gap: var(--sp-6) var(--sp-5); }
+}
+
+@media (min-width: 72rem) {
+  .hp-costs { grid-template-columns: repeat(4, 1fr); }
+}
+
+.hp-cost {
+  border-block-start: 2px solid var(--accent-500);
+  padding-block-start: var(--sp-4);
+}
+
+.hp-cost h3 {
+  font-size: var(--step-0);
+  margin-block-end: var(--sp-2);
+}
+
+.hp-cost p { margin: 0; color: var(--ink-600); font-size: var(--step--1); }
+
+/* ------------------------------------------------------- the role switcher */
+
+.hp-roles { border: 0; margin: 0; padding: 0; min-inline-size: 0; }
+
+.hp-legend {
+  padding: 0;
+  margin-block-end: var(--sp-3);
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--ink-400);
+}
+
+/* Transparent and 1px rather than display:none, which would take the inputs
+   out of the tab order and strand a keyboard user on the first role. */
+.hp-radio {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+.hp-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-5);
+  border-block-end: 1px solid var(--ink-100);
+}
+
+.hp-tabs label {
+  padding-block: var(--sp-3);
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--ink-400);
+  border-block-end: 2px solid transparent;
+  margin-block-end: -1px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.hp-tabs label:hover { color: var(--ink-800); }
+
+/* One grid, four panels, all in the same cell, so the panels crossfade instead
+   of blinking and the box keeps the height of the tallest of them. They differ
+   by 26px, so holding the taller one costs nothing visible and buys a layout
+   that never jumps mid-swap. */
+.hp-panels {
+  display: grid;
+  margin-block-start: var(--sp-5);
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+  background: #fff;
+  border: 1px solid var(--ink-100);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+}
+
+.hp-panel {
+  grid-area: 1 / 1;
+  opacity: 0;
+  /* visibility, not just opacity, so the three inactive panels stay out of the
+     accessibility tree and out of the tab order. */
+  visibility: hidden;
+  /* Held back until the fade-out has finished, or the outgoing panel would
+     disappear from under the finger. The checked rule below resets it to 0s,
+     so the incoming one is visible for the whole of its fade-in. */
+  --hp-vis-delay: 0.28s;
+}
+
+.hp-panel h3 { font-size: var(--step-1); }
+.hp-panel p { margin: 0; color: var(--ink-600); max-width: 58ch; }
+
+.hp-list {
+  list-style: none;
+  margin: var(--sp-5) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-3);
+  max-width: 58ch;
+}
+
+.hp-list li {
+  position: relative;
+  padding-inline-start: var(--sp-5);
+  color: var(--ink-700);
+}
+
+/* A short rule rather than a bullet glyph: it lines up with the serif body
+   text instead of floating beside it. */
+.hp-list li::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0.68em;
+  inset-inline-start: 0;
+  inline-size: 12px;
+  block-size: 2px;
+  background: var(--accent-500);
+}
+
+/* The switcher itself: one checked input decides which tab and which panel
+   are visible. Four inputs, eight rules, no script. */
+#hp-role-trainee:checked  ~ .hp-tabs label[for="hp-role-trainee"],
+#hp-role-trainer:checked  ~ .hp-tabs label[for="hp-role-trainer"],
+#hp-role-admin:checked    ~ .hp-tabs label[for="hp-role-admin"],
+#hp-role-platform:checked ~ .hp-tabs label[for="hp-role-platform"] {
+  color: var(--ink-900);
+  border-block-end-color: var(--accent-600);
+}
+
+#hp-role-trainee:checked  ~ .hp-panels .hp-panel--trainee,
+#hp-role-trainer:checked  ~ .hp-panels .hp-panel--trainer,
+#hp-role-admin:checked    ~ .hp-panels .hp-panel--admin,
+#hp-role-platform:checked ~ .hp-panels .hp-panel--platform {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  --hp-vis-delay: 0s;
+}
+
+#hp-role-trainee:focus-visible  ~ .hp-tabs label[for="hp-role-trainee"],
+#hp-role-trainer:focus-visible  ~ .hp-tabs label[for="hp-role-trainer"],
+#hp-role-admin:focus-visible    ~ .hp-tabs label[for="hp-role-admin"],
+#hp-role-platform:focus-visible ~ .hp-tabs label[for="hp-role-platform"] {
+  outline: 2px solid var(--accent-600);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------------------------------------------------- the role switcher swap */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The rise is 8px and quick. A taller or slower move reads as a page
+     transition rather than a tab, and drags the eye away from the tab row. */
+  .hp-panel {
+    transform: translateY(8px);
+    transition:
+      opacity 0.28s ease,
+      transform 0.28s cubic-bezier(0.22, 0.68, 0.35, 1),
+      visibility 0s linear var(--hp-vis-delay);
+  }
+
+  /* Matched to the panel so the underline finishes as the copy arrives. */
+  .hp-tabs label { transition-duration: 0.28s; }
+}
+
+/* -------------------------------------------------------------- the bento */
+
+/* Five cells, five cells' worth of content. The tall cell is assessment: it is
+   the one capability that changes what an employee can do to the platform
+   itself, so it earns the space. Auto-placement fills row two with the
+   remainder of the tall cell, which is why there are no holes. */
+.hp-bento {
+  display: grid;
+  gap: var(--sp-4);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 56rem) {
+  .hp-bento {
+    grid-template-columns: repeat(6, 1fr);
+    grid-auto-rows: minmax(10rem, auto);
+  }
+
+  .hp-cell { grid-column: span 3; }
+  .hp-cell--glow { grid-column: span 3; grid-row: span 2; }
+}
+
+.hp-cell {
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-5);
+  background: #fff;
+  border: 1px solid var(--ink-100);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+}
+
+.hp-cell h3 { font-size: var(--step-1); margin-block-end: var(--sp-2); }
+.hp-cell p { margin: 0 0 var(--sp-3); color: var(--ink-600); max-width: 46ch; }
+.hp-cell p:last-child { margin-block-end: 0; }
+
+/* Two tinted cells and one textured cell, so the grid is not six pieces of
+   the same white box. */
+.hp-cell--glow {
+  background: linear-gradient(158deg, var(--accent-100) 0%, #fff 62%);
+  border-color: #f6dcc0;
+  /* This cell is two rows tall and its copy is not, so something has to give.
+     space-between keeps the heading on the same line as its neighbours and
+     drops the last paragraph to the foot of the cell, rather than centring the
+     whole block, which would leave this heading 50px below the three beside
+     it. */
+  justify-content: space-between;
+}
+
+.hp-cell--rule { background: var(--ink-050); border-color: var(--ink-100); }
+
+/* Ruled-paper texture, the visual argument being that this is a ledger. */
+.hp-cell--texture { position: relative; overflow: hidden; }
+
+.hp-cell--texture::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgb(13 20 36 / 0.05) 0 1px,
+    transparent 1px 8px
+  );
+}
+
+.hp-cell--texture > * { position: relative; z-index: 1; }
+
+/* ------------------------------------------------------- the access steps */
+
+/* A vertical rail, not a horizontal one. Four steps read in order down a
+   single column at every width, so nothing has to be re-ordered by a
+   breakpoint, and the connector line can be continuous. */
+.hp-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-5);
+  max-width: 46rem;
+}
+
+.hp-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.5rem 1fr;
+  gap: var(--sp-4);
+}
+
+.hp-step::before {
+  content: "";
+  position: absolute;
+  inset-block: 2.75rem 0;
+  inset-inline-start: 1.24rem;
+  inline-size: 1px;
+  background: var(--ink-100);
+}
+
+.hp-step:last-child::before { display: none; }
+
+.hp-step__mark {
+  display: grid;
+  place-items: center;
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--accent-700);
+  background: #fff;
+  border: 1px solid var(--ink-100);
+  border-radius: var(--radius);
+}
+
+.hp-step h3 { font-size: var(--step-1); margin-block-end: var(--sp-2); }
+.hp-step p { margin: 0; color: var(--ink-600); }
+
+/* -------------------------------------------------------------- close band */
+
+.hp-close {
+  padding-block: clamp(3.5rem, 8vw, 6rem);
+  border-block-start: 1px solid var(--ink-100);
+  text-align: center;
+}
+
+.hp-close h2 {
+  font-size: clamp(var(--step-2), 1.8vw + 0.9rem, var(--step-3));
+  margin-block-end: var(--sp-3);
+}
+
+.hp-close .lede {
+  margin: 0 auto var(--sp-5);
+  max-width: 40ch;
+}
+
+/* ------------------------------------------------------------ reveal motion
+
+   Progressive enhancement, and deliberately gated twice over:
+
+   * on `.js`, so a browser without scripting shows every section already in
+     place rather than an empty page waiting for an observer that never runs;
+   * inside `prefers-reduced-motion: no-preference`, so the hidden starting
+     state only exists for a visitor whose OS has not asked for less motion.
+
+   One single-pass rise per element, staggered by the `--i` the markup already
+   carries. Nothing loops, and nothing moves on scroll except the reveal.
+   ------------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+
+  .js .hp-reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition:
+      opacity 0.5s ease,
+      transform 0.5s cubic-bezier(0.22, 0.68, 0.35, 1);
+    transition-delay: calc(var(--i, 0) * 70ms);
+  }
+
+  .js .hp-reveal.is-in { opacity: 1; transform: none; }
+}

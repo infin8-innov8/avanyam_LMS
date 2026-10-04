@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en"><body style="margin:0;padding:24px;background:#f4f6fa;
+  font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#0d1424">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e4e8f0;
+              border-radius:16px;padding:24px">
+    <p style="margin:0 0 4px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+              color:#9a4a06;font-weight:600">Approval needed</p>
+    <h1 style="font-size:24px;margin:0 0 16px">A registration is waiting</h1>
+
+    <p style="margin:0 0 16px">
+      <strong>{{ request.full_name }}</strong> ({{ request.email }}) has applied to
+      register for Avanyam LMS, asking to join as a
+      <strong>{{ request.get_requested_role_display }}</strong>.
+    </p>
+
+    {% if created_by %}
+      <p style="margin:0 0 16px;color:#5a6a86;font-size:14px">
+        A staff member entered this application on their behalf, so confirm it is
+        really theirs before approving.
+      </p>
+    {% endif %}
+
+    <p style="margin:0 0 20px">
+      <a href="{{ portal_url }}" style="display:inline-block;background:#c25e08;color:#fff;
+         text-decoration:none;font-weight:600;padding:11px 18px;border-radius:10px">
+        Review this application</a>
+    </p>
+
+    <p style="margin:0;color:#5a6a86;font-size:13px">
+      Submitted {{ request.created_at|date:"j M Y, H:i" }}. You are receiving this
+      because you can approve applications. Any admin can act on it, and you can
+      change the requested role before you approve.
+    </p>
+  </div>
+</body></html>

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}People and roles &middot; Avanyam LMS{% endblock %}
+
+{% comment %}
+  Admin-only role management (D49). This is the demote button: a trainer who
+  should not be delivering courses any more goes back to trainee here, in one
+  action, without a new application.
+
+  It is a separate page from the approval queue on purpose. The queue is about
+  applications nobody has decided yet; this is about people who already have
+  access. Putting them on one screen makes a list do two unrelated jobs, and the
+  filter that would fix that is the per-trainer filter we just deleted.
+
+  `admin` is deliberately not an option anywhere on this page. Admins are minted
+  with `manage.py createadmin`, so this screen cannot become a quieter second
+  route to admin. The policy enforces it; the absent option is only so the
+  interface does not offer a button that is guaranteed to fail.
+{% endcomment %}
+
+{% block content %}
+<div class="card card--flush">
+
+  <div class="card__header">
+    <p class="eyebrow">Administration</p>
+    <h1>People and roles</h1>
+    <p class="lede" style="margin-bottom:0">
+      Change what an approved account can do. Setting a role here replaces their
+      current trainee or trainer role, so a trainer who should be a trainee again
+      is one click rather than two.
+    </p>
+  </div>
+
+  {% if people %}
+    <ul class="queue">
+      {% for person in people %}
+        <li class="queue__item">
+          <div class="queue__body">
+            <div class="queue__who">
+              {{ person.full_name }}
+              <span class="badge badge--{{ person.approval_status }}">{{ person.approval_status }}</span>
+              {% if person.pk == request.user.pk %}
+                <span class="badge badge--pending">you</span>
+              {% endif %}
+            </div>
+            <div class="queue__meta">{{ person.email }}</div>
+            <div class="queue__meta">
+              {% with slugs=person.role_assignments.all %}
+                {% if slugs %}
+                  Currently:
+                  {% for assignment in slugs %}
+                    <strong>{{ assignment.role.name }}</strong>{% if not forloop.last %},{% endif %}
+                  {% endfor %}
+                {% else %}
+                  No role assigned.
+                {% endif %}
+              {% endwith %}
+            </div>
+          </div>
+
+          {% if person.pk == request.user.pk %}
+            {% comment %}
+              Rendered disabled rather than omitted. A row with no control reads as
+              "this person cannot be changed for a reason I am not told", and the
+              reason -- you may not change your own roles, or the deployment ends
+              up with nobody able to approve anybody -- is worth saying.
+            {% endcomment %}
+            <div class="queue__actions">
+              <p class="small muted" style="margin:0">
+                You cannot change your own roles. An admin can be created with
+                <code>manage.py createadmin</code>.
+              </p>
+            </div>
+          {% elif person.approval_status != "approved" %}
+            <div class="queue__actions">
+              <p class="small muted" style="margin:0">
+                Roles are granted at approval. This account is
+                {{ person.approval_status }}, so decide its application first.
+              </p>
+            </div>
+          {% else %}
+            <form method="post"
+                  action="{% url 'accounts:set-user-role' user_pk=person.pk %}"
+                  class="queue__actions">
+              {% csrf_token %}
+              <label class="small muted" for="role-{{ person.pk }}">Set role</label>
+              <select id="role-{{ person.pk }}" name="role">
+                {% for value, label in role_choices %}
+                  <option value="{{ value }}"
+                    {% for assignment in person.role_assignments.all %}
+                      {% if assignment.role.slug == value %}selected{% endif %}
+                    {% endfor %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <button class="btn btn--primary" type="submit"
+                      data-confirm="Change {{ person.full_name|escapejs }}'s role?"
+                      data-confirm-body="{{ person.full_name }} will be changed immediately. If this demotes a trainer, they lose trainer-only access on the next page they load."
+                      data-confirm-label="Change role">
+                Change role
+              </button>
+            </form>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="queue__empty">
+      <p class="queue__empty-title">No accounts yet.</p>
+      <p class="muted">Approved people appear here.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

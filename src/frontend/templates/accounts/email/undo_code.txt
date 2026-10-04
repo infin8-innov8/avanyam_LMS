@@ -1,4 +1,4 @@
-Hello {{ trainer.full_name }},
+Hello {{ admin.full_name }},
 
 You asked to reverse a rejection in Avanyam LMS.
 

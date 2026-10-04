@@ -1,16 +1,24 @@
 {% extends "base.html" %}
-{% block title %}Register &middot; Avanyam LMS{% endblock %}
+{% block title %}Create an account &middot; Avanyam LMS{% endblock %}
 {% block shell_class %}shell--narrow{% endblock %}
+
+{% comment %}
+  The on-behalf-of registration form. Identical fields to signup.html, because the
+  outcome is identical: a pending account plus an application that an admin still
+  has to approve. Entering somebody else's details here does *not* hand them
+  access -- that is the whole point, and the aside says so in as many words,
+  because "create an account" reads like a grant and is not one.
+{% endcomment %}
 
 {% block content %}
 <div class="split">
 
   <div class="card anim-rise" style="--i: 0">
-    <p class="eyebrow">Registration</p>
-    <h1>Request access</h1>
+    <p class="eyebrow">Register for somebody else</p>
+    <h1>Create an account</h1>
     <p class="lede">
-      Tell us who you are and which role you are applying for. An administrator will
-      review your request and approve your access.
+      Enter the person's details and choose the role they are applying for. An
+      administrator will still approve the application.
     </p>
 
     {% if form.non_field_errors %}
@@ -33,13 +41,14 @@
       <div class="field{% if form.email.errors %} field--error{% endif %}">
         <label for="{{ form.email.id_for_label }}">Email</label>
         {{ form.email }}
+        <span class="hint">The address they will be able to sign in with.</span>
         {% if form.email.errors %}
           <ul class="errorlist">{% for e in form.email.errors %}<li>{{ e }}</li>{% endfor %}</ul>
         {% endif %}
       </div>
 
       <div class="field{% if form.requested_role.errors %} field--error{% endif %}">
-        <label for="{{ form.requested_role.id_for_label }}">{{ form.requested_role.label }}</label>
+        <label for="{{ form.requested_role.id_for_label }}">Applying as</label>
         {{ form.requested_role }}
         <span class="hint">{{ form.requested_role.help_text }}</span>
         {% if form.requested_role.errors %}
@@ -64,31 +73,32 @@
         </div>
       </div>
 
-      <button class="btn btn--primary btn--block" type="submit">Submit request</button>
+      <button class="btn btn--primary btn--block" type="submit">Submit application</button>
     </form>
-
-    <p class="small muted" style="margin-top: var(--sp-4);">
-      Already registered? <a href="{% url 'accounts:login' %}">Sign in instead</a>.
-    </p>
   </div>
 
   <aside class="panel anim-rise" style="--i: 1">
-    <h2>What happens next</h2>
-    <ol>
-      <li><strong>You submit this form.</strong> Your account is created as
-        <em>pending</em> &mdash; nothing is unlocked, and you cannot sign in yet.</li>
-      <li><strong>An administrator is emailed.</strong> Every administrator can see
-        the request; nobody is named on it.</li>
-      <li><strong>They approve or decline.</strong> You receive an email either way,
-        including a reason if declined.</li>
-      <li><strong>You sign in.</strong> Courses and content unlock only after approval.</li>
-    </ol>
-    <div class="rule"></div>
+    <h2>What this does and does not do</h2>
+    <ul>
+      <li><strong>It creates a pending account.</strong> They cannot sign in, on any
+        screen, until an administrator approves the application.</li>
+      <li><strong>It grants no role.</strong> The role you pick is what they are
+        <em>asking</em> for. An admin may grant something else, and the account
+        holder is emailed which role they actually got.</li>
+      <li><strong>They are emailed.</strong> Every admin is notified, and the
+        applicant is told an admin has it.</li>
+    </ul>
+
+    {% comment %}
+      The password box is here because you have to supply something, and the
+      honest options are "choose it with them" or "issue a placeholder and force
+      a change". The second was the old model and it is gone (D43): a shared
+      placeholder is a credential several people know, which is why it no longer
+      exists. So: pick a password with them, over the phone or in person.
+    {% endcomment %}
     <p class="small">
-      Administrators run the LMS &mdash; they manage access and roles, and do not
-      teach or assess. Trainers deliver courses; trainees take them. An administrator
-      may change the role you asked for before approving, and you will be told which
-      role you actually received.
+      Choose the password with the person, and give it to them directly. There is no
+      forced change on first sign-in, so whatever you enter here is what they get.
     </p>
   </aside>
 

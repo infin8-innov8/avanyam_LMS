@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}My account &middot; Avanyam LMS{% endblock %}
+{% block shell_class %}shell--narrow{% endblock %}
+
+{% block content %}
+<div class="card">
+  <p class="eyebrow">My account</p>
+  <h1>{{ user_obj.full_name }}</h1>
+  <p class="muted small">{{ user_obj.email }}</p>
+
+  {% comment %}
+    This used to be the "waiting for approval" page, and it had an else-branch
+    explaining that a pending account could not sign in yet. That branch is gone
+    with the page: `PortalLoginView` refuses a non-approved account outright, so
+    nobody reaches this template in that state. What is left is an account page.
+  {% endcomment %}
+  {% if is_approved %}
+    <div class="note note--ok" role="status">
+      Your account is <strong>approved</strong>.
+      {% if roles %}
+        You are signed in as {% for role in roles %}<strong>{{ role }}</strong>{% if not forloop.last %} and {% endif %}{% endfor %}.
+      {% endif %}
+    </div>
+    <h2>Next</h2>
+    <p class="muted">Course catalogue and enrolments arrive in the next milestone.</p>
+  {% endif %}
+
+  <h2>Account</h2>
+  <p>
+    <a href="{% url 'accounts:password-change' %}">Change your password</a>
+  </p>
+
+  {% comment %}
+    Not rendered as "Your profile", because there is no profile page yet. A link to
+    a page that does not exist is worse than no link, and the accounts app is the
+    only place the person is modelled today.
+  {% endcomment %}
+</div>
+{% endblock %}

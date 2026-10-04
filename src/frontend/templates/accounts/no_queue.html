@@ -7,31 +7,34 @@
     <p class="eyebrow">Approvals</p>
     <h1>No approval queue for this account</h1>
     <p class="lede" style="margin-bottom:0">
-      Registration approvals are handled by trainers and admins. Your account does not
-      have that role, so there is no queue to show you here.
+      Registration approvals are handled by admins. There is one shared queue, and
+      your account does not have the role that opens it.
     </p>
   </div>
 
   <div style="padding: var(--sp-5)">
     <div class="note note--info" role="status">
       {% if pending_state %}
-        Your own registration is still {{ pending_state }}. You will be able to sign in
-        once a trainer approves it.
+        Your own registration is <strong>{{ pending_state }}</strong>. You will be able
+        to sign in once an administrator approves it.
       {% else %}
-        If you were expecting a queue, you are probably signed in as a trainee rather
-        than the trainer who owns these requests.
+        If you were expecting a queue, you are signed in as a trainee or trainer
+        rather than an administrator.
       {% endif %}
     </div>
 
-    <p class="small muted" style="margin-top: var(--sp-4)">
-      Approval queues are per-trainer: a trainer only ever sees the people who chose
-      them as their approver.
-    </p>
+    {% comment %}
+      This page used to explain that approval queues were per-trainer, which was
+      true then and is the reason this wording had to change twice in one slice.
+      There is nothing to add in its place: one queue, no per-person filter, so
+      there is no concept left to explain.
 
-    <p style="margin-top: var(--sp-4)">
-      <a class="btn" href="{% url 'accounts:pending' %}">Go to my account</a>
-      <a class="btn btn--ghost" href="{% url 'accounts:logout' %}">Sign out</a>
-    </p>
+      No "Go to my account" and no "Sign out" button here.
+
+      Sign out now lives behind the avatar in the masthead, on every page, so a
+      second copy on this one was a duplicate that had to be kept in step. The
+      account page is still one click away, via the wordmark.
+    {% endcomment %}
   </div>
 </div>
 {% endblock %}

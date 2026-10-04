@@ -1,0 +1,16 @@
+A registration application is waiting in the Avanyam LMS approval queue.
+
+  Name:      {{ request.full_name }}
+  Address:   {{ request.email }}
+  Requested: {{ request.get_requested_role_display }}
+  Submitted: {{ request.created_at|date:"j M Y, H:i" }}
+{% if created_by %}
+  Entered by: {{ created_by.full_name }} (staff)
+{% endif %}
+
+You are receiving this because you can approve applications. Any admin can act
+on this one; you do not have to be the only one to look.
+
+  Review: {{ portal_url }}
+
+-- Avanyam LMS

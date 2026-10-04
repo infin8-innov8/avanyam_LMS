@@ -5,16 +5,24 @@
 {% block content %}
 <div class="card">
   <p class="eyebrow">Application received</p>
-  <h1>Your request is with your trainer</h1>
+  <h1>Your application is with an administrator</h1>
 
   <div class="note note--ok" role="status">
-    Your account has been created as <strong>pending</strong>. Nothing is unlocked yet.
+    Your account has been created as <strong>pending</strong>. Nothing is unlocked yet,
+    and you cannot sign in until it is approved.
   </div>
 
   <p class="lede">
-    We have emailed the trainer you selected. You will get a second email as soon as
-    they approve or decline &mdash; there is nothing else for you to do right now.
+    We have emailed the administrators. You will get a second email as soon as your
+    application is approved or declined &mdash; there is nothing else for you to do
+    right now.
   </p>
+
+  {% comment %}
+    Deliberately says "administrators" and not a person. There is one shared queue
+    and no applicant-chosen approver, so naming anyone here would name a role
+    holder who may never look at this particular application.
+  {% endcomment %}
 
   <p>
     <a class="btn btn--primary" href="{% url 'accounts:login' %}">Go to sign in</a>

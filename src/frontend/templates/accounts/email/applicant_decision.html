@@ -7,14 +7,26 @@
               font-weight:600;color:{% if approved %}#157347{% elif redirected %}#c25e08{% else %}#b3261e{% endif %}">
       {% if approved %}Registration approved{% elif redirected %}Not approved this time{% else %}Registration declined{% endif %}</p>
     <h1 style="font-size:24px;margin:0 0 16px">
-      {% if approved %}You are in{% elif redirected %}Try a different trainer{% else %}Not approved{% endif %}</h1>
+      {% if approved %}You are in{% elif redirected %}You can try again{% else %}Not approved{% endif %}</h1>
 
     <p style="margin:0 0 16px">Hello {{ request.full_name }},</p>
 
     {% if approved %}
-      <p style="margin:0 0 20px">
-        {{ decided_by.full_name }} approved your registration. Sign in to begin.
+      <p style="margin:0 0 12px">
+        {{ decided_by.full_name }} approved your registration. You have joined as a
+        <strong>{{ granted_role|default:"member" }}</strong>.
       </p>
+      {% if role_overridden %}
+        <p style="margin:0 0 20px;padding:12px 14px;background:#fff8ec;
+                    border:1px solid #f3e2c4;border-left:4px solid #c25e08;border-radius:10px;
+                    color:#5a3d10;font-size:14px">
+          You asked to join as a {{ request.requested_role }}, and the role granted is
+          different. If that was not what you expected, an administrator can change
+          it &mdash; nothing about your account is locked to this.
+        </p>
+      {% else %}
+        <div style="margin:0 0 20px"></div>
+      {% endif %}
       <p style="margin:0 0 20px">
         <a href="{{ login_url }}" style="display:inline-block;background:#c25e08;color:#fff;
            text-decoration:none;font-weight:600;padding:11px 18px;border-radius:10px">
@@ -24,7 +36,7 @@
     {% elif redirected %}
       <p style="margin:0 0 16px">
         {{ decided_by.full_name }} did not approve this application, but you are
-        welcome to register again &mdash; quite possibly with a different trainer.
+        welcome to register again.
       </p>
       <p style="margin:0 0 16px;color:#5a6a86">
         Reason: {{ request.decision_note|default:"not supplied" }}
@@ -48,8 +60,8 @@
       </p>
       <p style="margin:0;color:#5a6a86;font-size:13px">
         This address cannot register again. If you think this is a mistake, contact
-        the trainer you selected rather than registering again &mdash; they can reverse
-        the decision.
+        an administrator rather than registering again &mdash; they can reverse the
+        decision.
       </p>
     {% endif %}
   </div>

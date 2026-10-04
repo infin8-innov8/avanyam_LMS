@@ -3,31 +3,75 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="{% block meta_description %}Avanyam is the internal platform for learning and capability building: courses, assessments, competency mapping and certification.{% endblock %}">
   <meta name="referrer" content="same-origin">
   <title>{% block title %}Avanyam LMS{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
   <link rel="stylesheet" href="{% static 'css/avanyam.css' %}">
+  {% block stylesheets %}{% endblock %}
   <script>document.documentElement.className = document.documentElement.className.replace(/\bno-js\b/, "js");</script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
 
   <header class="masthead">
-    <a class="wordmark" href="{% url 'accounts:pending' %}">
+    <a class="wordmark" href="{% block wordmark_url %}{% url 'accounts:home' %}{% endblock %}">
       <span>Avanyam</span>
       <span class="dot" aria-hidden="true"></span>
       <span class="tag">Learning &amp; Development</span>
     </a>
     <nav aria-label="Primary">
       {% if user.is_authenticated %}
-        <a href="{% url 'accounts:pending' %}">My account</a>
-        {% if user.is_trainer %}
-          <a href="{% url 'accounts:trainer-queue' %}">Approvals</a>
+        {% comment %}
+          Nav items are gated on the model properties `is_admin` and `is_trainer`
+          rather than on a single `{% if user.is_trainer %}` standing in for all
+          three cases. "Who does what" is the question this whole slice answered
+          differently: the queue and role management are admin-only, while creating
+          an account is open to trainers too.
+
+          The properties exist because Django template tags cannot call a method
+          with an argument -- `{% if user.has_role "admin" %}` is a syntax error.
+          See `User.is_admin` and the same caveat on `User.is_trainer`: views must
+          ask `policies.*`, and these are for rendering only.
+        {% endcomment %}
+        {% if user.is_admin %}
+          <a href="{% url 'accounts:admin-queue' %}">Approvals</a>
+          <a href="{% url 'accounts:role-management' %}">People</a>
         {% endif %}
-        <form class="inline-form" method="post" action="{% url 'accounts:logout' %}">
-          {% csrf_token %}
-          <button class="btn btn--ghost" type="submit">Sign out</button>
-        </form>
+        {% if user.is_trainer %}
+          <a href="{% url 'accounts:create-account' %}">Create account</a>
+        {% endif %}
+
+        {% comment %}
+          The account menu, as a disclosure rather than a link row.
+
+          One avatar instead of a "My account" link and a "Sign out" button: both
+          of those are the same two words on every screen of the product, and
+          they out-shouted the thing people actually came for. The avatar opens
+          a panel carrying who you are and the one action that ends the session.
+
+          A checkbox, not a script. Toggling it is the browser's job, so the
+          panel opens with JS blocked; portal.js only adds Escape and
+          outside-click, which CSS cannot do. `aria-expanded` is deliberately
+          absent -- a checkbox already reports checked to a screen reader, and
+          an `aria-expanded` that a stylesheet controls is a lie waiting to
+          happen.
+        {% endcomment %}
+        <div class="usermenu">
+          <input class="usermenu__toggle" type="checkbox" id="usermenu-toggle">
+          <label class="avatar" for="usermenu-toggle">
+            <span class="avatar__letters" aria-hidden="true">{{ user.initials }}</span>
+            <span class="sr-only">Account menu for {{ user.full_name }}</span>
+          </label>
+          <div class="usermenu__panel">
+            <p class="usermenu__name">{{ user.full_name }}</p>
+            <p class="usermenu__email">{{ user.email }}</p>
+            <form class="inline-form" method="post" action="{% url 'accounts:logout' %}">
+              {% csrf_token %}
+              <button class="btn btn--ghost" type="submit">Sign out</button>
+            </form>
+          </div>
+        </div>
       {% else %}
         <a href="{% url 'accounts:login' %}">Sign in</a>
         <a class="btn btn--primary" href="{% url 'accounts:signup' %}">Register</a>
@@ -130,26 +174,57 @@
     JS off it never opens and accounts/undo_request.html does the same two steps
     as a page.
   {% endcomment %}
-  <dialog class="confirm" id="undo-dialog"
-          aria-labelledby="undo-title" aria-describedby="undo-body">
-    <h2 class="confirm__title" id="undo-title">Undo this decline?</h2>
-    <p class="confirm__body" id="undo-body"></p>
+  {% comment %}
+    The undo panel, not a modal.
 
-    <p class="confirm__error" id="undo-error" role="alert" hidden></p>
+    It sits at the top of the screen in the same place and the same visual language
+    as the toasts that report a decision, and it arrives on the same `toast-in`
+    motion. That was the point: a rejected row is undone while the trainer is
+    looking at a list, and a centred modal covers the list they still need. A
+    centred <dialog> was the wrong shape for it.
 
-    <div class="undo__code" id="undo-step-code" hidden>
-      <label class="undo__code-label" for="undo-code-input">Six-digit code</label>
-      <input class="undo__code-input" type="text" id="undo-code-input"
-             name="code" inputmode="numeric" autocomplete="one-time-code"
-             pattern="[0-9]{6}" maxlength="6" placeholder="000000">
+    It is a panel rather than a toast because it is not transient -- the code has
+    to be typed into it -- so it never auto-dismisses and the countdown is the only
+    thing on screen that moves.
+  {% endcomment %}
+  <div class="otp" id="undo-otp" hidden>
+    <div class="otp__panel" role="dialog" aria-labelledby="undo-title"
+         aria-describedby="undo-body">
+      <p class="otp__eyebrow">Undo decline</p>
+      <h2 class="otp__title" id="undo-title">Undo this decline?</h2>
+      <p class="otp__body" id="undo-body"></p>
+
+      {% comment %}
+        The countdown is rendered from the server's expiry, never from a locally
+        started ten minutes: the token's own clock is the only one that decides
+        whether a code still works, so the timer is a readout of it rather than a
+        second opinion.
+      {% endcomment %}
+      <p class="otp__meta" id="undo-countdown" hidden>
+        <span class="otp__meta-text">
+          Sent to <span id="undo-otp-email"></span>
+        </span>
+        <span class="otp__clock" id="undo-clock" role="timer">10:00</span>
+      </p>
+
+      <div class="otp__code" id="undo-step-code" hidden>
+        <label class="otp__code-label" for="undo-code-input">Six-digit code</label>
+        <input class="otp__code-input" type="text" id="undo-code-input"
+               name="code" inputmode="numeric" autocomplete="one-time-code"
+               pattern="[0-9]{6}" maxlength="6" placeholder="000000"
+               aria-describedby="undo-error">
+      </div>
+
+      <p class="otp__error" id="undo-error" role="alert" hidden></p>
+
+      <div class="otp__actions">
+        <button class="btn btn--ghost" type="button" data-undo-cancel>Cancel</button>
+        <button class="btn btn--undo" type="button" data-undo-accept></button>
+      </div>
     </div>
+  </div>
 
-    <div class="confirm__actions">
-      <button class="btn btn--ghost" type="button" data-undo-cancel>Cancel</button>
-      <button class="btn btn--undo" type="button" data-undo-accept></button>
-    </div>
-  </dialog>
-
+  {% block scripts %}{% endblock %}
   <script src="{% static 'js/portal.js' %}" defer></script>
 
   <footer class="footer">

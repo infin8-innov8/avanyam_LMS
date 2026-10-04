@@ -3,13 +3,19 @@ Hello {{ request.full_name }},
 {% if approved %}
 Your Avanyam LMS registration was APPROVED by {{ decided_by.full_name }}.
 
+You have joined as a {{ granted_role|default:"member" }}.
+{% if role_overridden %}
+You asked to join as a {{ request.requested_role }}, so please note the role that
+was actually granted is the one above.
+{% endif %}
+
 You can now sign in:
 
 {{ login_url }}
 
 {% elif redirected %}
 Your Avanyam LMS registration was not approved by {{ decided_by.full_name }} --
-but you are welcome to register again, most likely with a different trainer.
+but you are welcome to register again.
 
 Reason: {{ request.decision_note|default:"not supplied" }}
 
@@ -25,8 +31,8 @@ Your Avanyam LMS registration was NOT approved by {{ decided_by.full_name }}.
 
 Reason: {{ request.decision_note|default:"not supplied" }}
 
-This address cannot register again. If you believe this is a mistake, contact the
-trainer you selected -- they can reverse the decision.
+This address cannot register again. If you believe this is a mistake, contact an
+administrator -- they can reverse the decision.
 {% endif %}
 
 -- Avanyam LMS

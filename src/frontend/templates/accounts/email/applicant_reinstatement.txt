@@ -2,12 +2,12 @@ Hello {{ request.full_name }},
 
 Your rejection in Avanyam LMS has been reversed.
 
-    Decided by: {{ trainer.full_name|default:"an administrator" }}
+    Reversed by: {{ admin.full_name|default:"an administrator" }}
     Reason on file: {{ request.decision_note|default:"not supplied" }}
 
-Your application is back in the approval queue with the same trainer. You do not
-need to register again, and your previous password still works. You will be told
-as soon as it is decided.
+Your application is back in the approval queue. You do not need to register
+again, and your previous password still works. You will be told as soon as it is
+decided.
 
 Sign in here:
 
