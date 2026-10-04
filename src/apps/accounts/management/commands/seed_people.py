@@ -1,27 +1,36 @@
 """Seed the people named in the project brief.
 
-Idempotent: safe to re-run. Passwords follow a caller-supplied template and each
-account is flagged `must_change_password`, so the predictable initial value is
-only ever good for one login.
+Idempotent: safe to re-run.
 
-The password template is read from the environment, never hard-coded. A pattern
-of `activ8*o(<first name>)` is guessable from a name that the UI displays, so
-it is deliberately not in the repository -- only a placeholder is.
+**Roles are granted only to approved accounts.** A pending account holds no
+RoleAssignment, because signup grants none and the invariant is that an account
+becomes useful exactly when it becomes approved. The old version of this command
+gave every seeded account a role *and* set `must_change_password`, which meant the
+seed data described a state the application cannot produce.
+
+**No account is issued a predictable password.** `must_change_password` is gone
+(D43) and nothing replaced it, because there is no forced change to satisfy: a
+shared placeholder was a credential several people knew. So this command takes
+one explicitly-supplied password and refuses to invent a pattern from a name. The
+password comes from the environment, never from this file.
+
+Trained/pending split:
+
+* trainers are created **approved** with the trainer role -- otherwise nobody can
+  demonstrate the queue;
+* trainees are created **pending** with no role, and their SignupRequest carries
+  the role they asked for.
 """
 
 from __future__ import annotations
 
 import os
-import re
-import secrets
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
-from django.utils.text import slugify
 
-from apps.accounts.domain.enums import ApprovalStatus, AuthSource
+from apps.accounts.domain.enums import ApprovalStatus, AuthSource, RequestedRole
 from apps.accounts.models import (
-    ROLE_ADMIN,
     ROLE_TRAINEE,
     ROLE_TRAINER,
     Role,
@@ -30,13 +39,10 @@ from apps.accounts.models import (
     User,
 )
 
-#: placeholder, not a real pattern -- set ACCOUNTS_SEED_PASSWORD_TEMPLATE
-FALLBACK_TEMPLATE = "REPLACE-ME-{first_name}"
-
-# example.com addresses, per RFC 2606: reserved for documentation and never
-# deliverable. The real roster is deployment data and belongs in .env, not
-# in a public repository -- a colleague's address should not be published
-# by a code push.
+#: example.com addresses, per RFC 2606: reserved for documentation and never
+#: deliverable. The real roster is deployment data and belongs in .env, not
+#: in a public repository -- a colleague's address should not be published
+#: by a code push.
 TRAINERS = [
     ("Trainer One", "trainer1@example.com"),
     ("Trainer Two", "trainer2@example.com"),
@@ -52,111 +58,101 @@ TRAINEES = [
 ]
 
 
-def first_name(full_name: str) -> str:
-    return full_name.split()[0]
-
-
 class Command(BaseCommand):
     help = "Create the trainers and trainees named in the project brief."
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
-            "--password-template",
-            default=os.environ.get("ACCOUNTS_SEED_PASSWORD_TEMPLATE", FALLBACK_TEMPLATE),
-            help="Password pattern; {first_name} is substituted.",
+            "--password",
+            default=os.environ.get("ACCOUNTS_SEED_PASSWORD", ""),
+            help=(
+                "One password for every seeded account. Reads "
+                "ACCOUNTS_SEED_PASSWORD from the environment by default."
+            ),
         )
         parser.add_argument(
-            "--approve-trainers",
+            "--approve-trainees",
             action="store_true",
-            default=True,
-            help="Trainers start approved so they can use the queue (default).",
-        )
-        parser.add_argument(
-            "--trainees-pending",
-            action="store_true",
-            default=True,
-            help="Trainees start pending, awaiting a trainer decision (default).",
+            help=(
+                "Approve the trainees too and grant them the trainee role. Off by "
+                "default: leaving them pending is what makes the queue demonstrable."
+            ),
         )
 
     def handle(self, *args, **options) -> None:
-        template = options["password_template"]
-        if "{first_name}" not in template:
+        password = options["password"]
+        if not password:
             raise CommandError(
-                "--password-template must contain the literal '{first_name}' placeholder."
+                "Refusing to seed without a password: set ACCOUNTS_SEED_PASSWORD in "
+                "the environment or pass --password. There is no default. Every "
+                "seeded account shares this one value, so use it for a demo "
+                "database only -- 'manage.py createadmin' is the per-person path."
             )
 
-        if "REPLACE-ME" in template:
-            raise CommandError(
-                "Refusing to seed predictable passwords: set "
-                "ACCOUNTS_SEED_PASSWORD_TEMPLATE in the environment (or pass "
-                "--password-template) with a real pattern. Every seeded account is "
-                "flagged must_change_password regardless, but do not ship a default."
-            )
+        approve_trainees = options["approve_trainees"]
+        created, updated = 0, 0
 
-        created, updated, skipped = 0, 0, 0
         with transaction.atomic():
-            trainer_role, _ = Role.objects.get_or_create(
-                slug=ROLE_TRAINER, defaults={"name": "Trainer"}
-            )
-            trainee_role, _ = Role.objects.get_or_create(
-                slug=ROLE_TRAINEE, defaults={"name": "Trainee"}
-            )
+            trainer_role = self._role(ROLE_TRAINER, "Trainer")
+            trainee_role = self._role(ROLE_TRAINEE, "Trainee")
 
-            trainers: list[User] = []
             for full_name, email in TRAINERS:
-                user, was_created = self._upsert(
+                _, was_created = self._upsert(
                     full_name=full_name,
                     email=email,
-                    password=template.format(first_name=first_name(full_name)),
+                    password=password,
+                    approval_status=ApprovalStatus.APPROVED,
+                    # Approved, so the role goes on now. `assigned_by=None` because
+                    # nobody performed this approval -- it is seed data, not a
+                    # decision, and inventing an actor would put a name in the
+                    # audit trail that never acted.
                     role=trainer_role,
-                    approval_status=(
-                        ApprovalStatus.APPROVED
-                        if options["approve_trainers"]
-                        else ApprovalStatus.PENDING
-                    ),
+                    requested_role=RequestedRole.TRAINER,
                 )
-                trainers.append(user)
                 created += was_created
                 updated += not was_created
 
             for full_name, email in TRAINEES:
-                user, was_created = self._upsert(
+                trainee_status = (
+                    ApprovalStatus.APPROVED
+                    if approve_trainees
+                    else ApprovalStatus.PENDING
+                )
+                _, was_created = self._upsert(
                     full_name=full_name,
                     email=email,
-                    password=template.format(first_name=first_name(full_name)),
-                    role=trainee_role,
-                    approval_status=(
-                        ApprovalStatus.PENDING
-                        if options["trainees_pending"]
-                        else ApprovalStatus.APPROVED
-                    ),
-                    selected_trainer=self._default_trainer(email, trainers),
+                    password=password,
+                    approval_status=trainee_status,
+                    # None while pending. Passing the role unconditionally would
+                    # hand a pending account a capability, which is the invariant
+                    # this command exists to stop breaking.
+                    role=trainee_role if approve_trainees else None,
+                    requested_role=RequestedRole.TRAINEE,
                 )
-                skipped += 0 if user else 1
                 created += was_created
                 updated += not was_created
 
-        self.stdout.write(self.style.SUCCESS(
-            f"seeded: {created} created, {updated} updated, {skipped} skipped"
-        ))
-        self.stdout.write(f"  trainers: {len(TRAINERS)}  trainees: {len(TRAINEES)}")
         self.stdout.write(
-            "  all seeded accounts have must_change_password=True and must reset "
-            "before first use"
+            self.style.SUCCESS(f"seeded: {created} created, {updated} updated")
+        )
+        self.stdout.write(f"  trainers: {len(TRAINERS)}  trainees: {len(TRAINEES)}")
+        if approve_trainees:
+            self.stdout.write("  trainees are approved and hold the trainee role")
+        else:
+            self.stdout.write(
+                "  trainees are pending, hold no role, and cannot sign in until an "
+                "admin approves them"
+            )
+        self.stdout.write(
+            self.style.WARNING(
+                "  every seeded account shares one password -- this is demo data"
+            )
         )
 
-    def _default_trainer(self, trainee_email: str, trainers: list[User]) -> User | None:
-        """Assign a trainer so seeded trainees can be approved by someone.
-
-        Nobody was designated in the brief, so this splits trainees across the
-        available trainers deterministically. It is a *starting point*, not a
-        policy: a trainee can change their choice before submitting, and an
-        admin can reassign later.
-        """
-        if not trainers:
-            return None
-        index = sum(ord(c) for c in trainee_email.lower()) % len(trainers)
-        return trainers[index]
+    @staticmethod
+    def _role(slug: str, name: str) -> Role:
+        row, _ = Role.objects.get_or_create(slug=slug, defaults={"name": name})
+        return row
 
     def _upsert(
         self,
@@ -164,13 +160,11 @@ class Command(BaseCommand):
         full_name: str,
         email: str,
         password: str,
-        role: Role,
         approval_status: ApprovalStatus,
-        selected_trainer: User | None = None,
+        role: Role | None,
+        requested_role: RequestedRole,
     ) -> tuple[User, bool]:
         email = User.objects.normalize_email(email).strip()
-        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
-            raise CommandError(f"refusing to seed malformed email: {email!r}")
 
         user = User.objects.filter(email__iexact=email).first()
         was_created = user is None
@@ -183,32 +177,25 @@ class Command(BaseCommand):
                 # target topology; `signup` records that they arrived through the
                 # portal rather than being break-glass local admins.
                 auth_source=AuthSource.SIGNUP,
-                approval_status=approval_status,
-                selected_trainer=selected_trainer,
-                must_change_password=True,
             )
-        else:
-            user.full_name = full_name
-            user.approval_status = approval_status
-            if selected_trainer is not None:
-                user.selected_trainer = selected_trainer
-            user.must_change_password = True
-
+        user.full_name = full_name
+        user.approval_status = approval_status
         user.set_password(password)
         user.save()
 
-        RoleAssignment.objects.get_or_create(
-            user=user, role=role, defaults={"assigned_by": None}
-        )
+        if role is not None:
+            RoleAssignment.objects.get_or_create(
+                user=user, role=role, defaults={"assigned_by": None}
+            )
 
-        # A trainer's presence in the queue is what makes the approval flow
-        # demonstrable, so give seeded trainees a durable SignupRequest row too.
-        # Docs §6.2: retained after rejection, so it is created only if absent.
+        # A pending applicant's row is what puts them in the queue, so it is
+        # created only if absent: `SignupRequest` is the durable record of a
+        # decision and must not be reset by a re-run of seed data.
         SignupRequest.objects.get_or_create(
             email=email,
             defaults={
                 "full_name": full_name,
-                "selected_trainer": selected_trainer,
+                "requested_role": requested_role,
                 "status": approval_status,
                 "user": user,
             },
