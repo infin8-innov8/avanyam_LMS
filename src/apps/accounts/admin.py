@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from django import forms
 from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth import password_validation
+from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.core.exceptions import ValidationError
 
 from apps.accounts.models import Role, RoleAssignment, SignupRequest, User
@@ -78,10 +78,16 @@ class UserAdmin(DjangoUserAdmin):
     form = UserChangeForm
     add_form = UserCreationForm
     inlines = [RoleInline]
-    list_display = ("email", "full_name", "auth_source", "approval_status", "is_trainer", "selected_trainer")
+    list_display = ("email", "full_name", "auth_source", "approval_status", "is_trainer")
     list_filter = ("approval_status", "auth_source", "is_active", "role_assignments__role__slug")
     search_fields = ("email", "full_name", "oidc_subject", "ldap_dn")
-    readonly_fields = ("id", "created_at", "updated_at", "last_login")
+    readonly_fields = (
+        "id",
+        "created_at",
+        "updated_at",
+        "last_login",
+        "selected_trainer",
+    )
     ordering = ("full_name",)
     filter_horizontal = ("groups", "user_permissions")
 
@@ -95,8 +101,22 @@ class UserAdmin(DjangoUserAdmin):
     fieldsets = (
         (None, {"fields": ("id", "email", "full_name", "password")}),
         ("Identity source", {"fields": ("auth_source", "oidc_subject", "ldap_dn")}),
-        ("Approval", {"fields": ("approval_status", "decided_by", "decided_at", "selected_trainer")}),
-        ("Security", {"fields": ("must_change_password", "is_active", "is_staff", "is_superuser")}),
+        # `selected_trainer` is a deprecated column kept only so the FK that
+        # production data points at still resolves (D42). It is readonly, not
+        # just hidden: a superuser editing it in /admin/ would be writing the one
+        # field the application deliberately ignores, which is exactly the sort
+        # of drift the deprecation is meant to prevent. It stays listed so an
+        # operator can see historical values during a migration.
+        (
+            "Approval",
+            {
+                "fields": ("approval_status", "decided_by", "decided_at"),
+                "description": "",
+            },
+        ),
+        # `must_change_password` was removed from the model (D43); no placeholder
+        # for it remains in this fieldset.
+        ("Security", {"fields": ("is_active", "is_staff", "is_superuser")}),
         (
             "Timestamps",
             {"fields": ("last_login", "date_joined", "created_at", "updated_at"), "classes": ("collapse",)},
@@ -123,8 +143,19 @@ class RoleAdmin(admin.ModelAdmin):
 
 @admin.register(SignupRequest)
 class SignupRequestAdmin(admin.ModelAdmin):
-    list_display = ("full_name", "email", "selected_trainer", "status", "created_at", "decided_at")
-    list_filter = ("status",)
+    list_display = (
+        "full_name",
+        "email",
+        "requested_role",
+        "status",
+        "created_at",
+        "decided_at",
+    )
+    list_filter = ("status", "requested_role")
     search_fields = ("full_name", "email")
-    readonly_fields = ("id", "created_at", "updated_at")
-    autocomplete_fields = ("selected_trainer", "decided_by", "user")
+    # `created_by` is writable here deliberately: it is a record of who filled
+    # the form in, and correcting a mis-entered value is an ordinary data fix.
+    # `selected_trainer` is readonly for the same reason as on User -- it is
+    # deprecated and the application ignores it (D42).
+    readonly_fields = ("id", "created_at", "updated_at", "selected_trainer")
+    autocomplete_fields = ("decided_by", "user", "created_by")
