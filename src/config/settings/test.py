@@ -10,7 +10,7 @@ Three things this module exists to guarantee:
    A test suite that can send mail through a live Gmail relay is a test suite
    that eventually emails a customer.
 2. **No real Redis / broker.** Celery runs tasks eagerly and inline, so
-   `notify_trainer_of_application.delay(...)` executes in-process. That keeps the
+   `notify_admins_of_application.delay(...)` executes in-process. That keeps the
    tests deterministic and removes the worker from the test's critical path.
    It also means `transaction.on_commit` hooks really do run, so a test can
    assert on the mail a signup produced.

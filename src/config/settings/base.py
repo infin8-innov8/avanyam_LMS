@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     # abstract models; `accounts` is the first context implemented.
     "apps.common",
     "apps.accounts",
+    "apps.pages",
     # Third-party (all pinned in uv.lock, all verified importable on this host)
     "rest_framework",
     "django_filters",
@@ -78,14 +79,15 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # Outermost: binds a request id and times the request, so every line logged
+    # by the middleware below it carries the same correlation id.
+    "config.middleware.RequestContextMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    # Enforces must_change_password before any other view logic runs.
-    "apps.accounts.middleware.MustChangePasswordMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",

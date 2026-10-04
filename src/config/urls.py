@@ -1,8 +1,10 @@
 """Root URLconf.
 
-`/` is the login page, not a marketing splash: the product is an internal LMS
-and every visitor needs an account, so the root is where someone already
-authenticated lands or, more often, where an anonymous one starts signing in.
+`/` is the public front door: a visitor reads what the platform is before being
+asked for an account. It used to redirect straight to the login page, which was
+right while the product had one screen and wrong once there was something to
+say about it. Signing in stays one click away, and `/accounts/login/` is
+unchanged for anybody who already had it bookmarked.
 
 Mount point note: `include()` inherits the *including* file's prefix, so
 `path("accounts/", include("apps.accounts.urls"))` mounts that app's own
@@ -25,6 +27,6 @@ urlpatterns = [
     # Kept for parity with the load-balancer contract even though `/livez` is
     # the documented name; a probe configured against the old path keeps working.
     path("healthz", health.livez, name="healthz"),
-    path("", RedirectView.as_view(pattern_name="accounts:login", permanent=False)),
+    path("", include("apps.pages.urls")),
     path("favicon.ico", RedirectView.as_view(url="/static/favicon.ico", permanent=False)),
 ]

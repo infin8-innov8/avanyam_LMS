@@ -10,8 +10,8 @@ a developer machine -- permissive hosts, the browsable API, the debug toolbar
 style error pages -- lives in this file and nowhere else, so `prod` cannot
 inherit it by accident.
 """
-from .base import *  # noqa: F401,F403
-from .base import BASE_DIR, env
+from .base import *
+from .base import env
 
 DEBUG = env.bool("DJANGO_DEBUG", default=True)
 
@@ -22,7 +22,7 @@ INTERNAL_IPS = ["127.0.0.1"]
 
 # Browsable API is a development affordance.
 REST_FRAMEWORK = {
-    **REST_FRAMEWORK,  # noqa: F405
+    **REST_FRAMEWORK,
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
         "rest_framework.renderers.BrowsableAPIRenderer",
@@ -50,6 +50,6 @@ X_FRAME_OPTIONS = "DENY"
 # it is relied on in production.
 AXES_ENABLED = True
 
-LOGGING = logging_config(  # noqa: F405
+LOGGING = logging_config(
     env("DJANGO_LOG_LEVEL", default="INFO"), sql_debug=env.bool("DJANGO_SQL_DEBUG", default=False)
 )
