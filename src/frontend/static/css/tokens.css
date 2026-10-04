@@ -1,0 +1,66 @@
+/*
+ * Avanyam design tokens -- single source of truth for colour, type and space.
+ *
+ * `tokens.css` lives at `src/` per architecture.md §16.1 and is imported by the
+ * stylesheet; templates must not hard-code hex values, so a palette change is a
+ * one-file edit rather than a sweep through every template.
+ *
+ * Direction: an institutional training portal. Ink-navy surfaces for authority,
+ * a single saffron accent (Avanyam = "a sense of pride / self-respect") used
+ * sparingly so it reads as a call to action rather than decoration. Both
+ * foreground/background pairs below are >= 4.5:1 on their intended surface.
+ */
+
+:root {
+  /* Brand ramp */
+  --ink-900: #0d1424;
+  --ink-800: #141d33;
+  --ink-700: #1d2942;
+  --ink-600: #2a3752;
+  --ink-400: #5a6a86;
+  --ink-300: #8593ab;
+  --ink-100: #e4e8f0;
+  --ink-050: #f4f6fa;
+
+  /* Accent -- saffron */
+  --accent-700: #9a4a06;
+  --accent-600: #c25e08;
+  --accent-500: #e2760c;
+  --accent-400: #f59e42;
+  --accent-100: #fdeedb;
+
+  /* Status */
+  --ok-600: #157347;
+  --ok-100: #e3f5ec;
+  --warn-600: #91560a;
+  --warn-100: #fdf1dc;
+  --bad-600: #b3261e;
+  --bad-100: #fce9e7;
+
+  /* Typography */
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+
+  --step--1: 0.875rem;
+  --step-0: 1rem;
+  --step-1: 1.25rem;
+  --step-2: 1.563rem;
+  --step-3: 1.953rem;
+  --step-4: 2.441rem;
+
+  /* Space */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2rem;
+  --sp-7: 3rem;
+
+  --radius: 10px;
+  --radius-lg: 16px;
+  --shadow-1: 0 1px 2px rgba(13, 20, 36, 0.08), 0 1px 3px rgba(13, 20, 36, 0.06);
+  --shadow-2: 0 12px 32px rgba(13, 20, 36, 0.16);
+  --ring: 0 0 0 3px var(--accent-400);
+}

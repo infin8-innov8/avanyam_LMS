@@ -1,0 +1,19 @@
+Hello {{ trainer.full_name }},
+
+You asked to reverse a rejection in Avanyam LMS.
+
+    Applicant: {{ request.full_name }}
+    Email:      {{ request.email }}
+
+Use this code within {{ minutes }} minutes to return the application to the
+approval queue:
+
+    {{ code }}
+
+It works once. If it expires or you enter it wrongly too many times, ask for
+another.
+
+If you did not ask for this code, ignore this message and change your Avanyam
+password. Someone with access to your account may have requested it.
+
+-- Avanyam LMS

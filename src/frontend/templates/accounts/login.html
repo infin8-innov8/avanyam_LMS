@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Sign in &middot; Avanyam LMS{% endblock %}
+{% block shell_class %}shell--narrow{% endblock %}
+
+{% block content %}
+<div class="split">
+
+  <div class="card anim-rise" style="--i: 0">
+    <p class="eyebrow">Sign in</p>
+    <h1>Welcome back</h1>
+    <p class="lede">Use the email address your trainer approved.</p>
+
+    {% if form.non_field_errors %}
+      <div class="note note--bad" role="alert">
+        {% for error in form.non_field_errors %}
+          <div>{{ error }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      <div class="field{% if form.username.errors %} field--error{% endif %}">
+        <label for="{{ form.username.id_for_label }}">Email</label>
+        {{ form.username }}
+        {% if form.username.errors %}
+          <ul class="errorlist">{% for e in form.username.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% endif %}
+      </div>
+
+      <div class="field{% if form.password.errors %} field--error{% endif %}">
+        <label for="{{ form.password.id_for_label }}">Password</label>
+        {{ form.password }}
+        {% if form.password.errors %}
+          <ul class="errorlist">{% for e in form.password.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% endif %}
+      </div>
+
+      {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+      <button class="btn btn--primary btn--block" type="submit">Sign in</button>
+    </form>
+
+    <p class="small muted" style="margin-top: var(--sp-4);">
+      Need access? <a href="{% url 'accounts:signup' %}">Register as a trainee</a>.
+    </p>
+  </div>
+
+  <aside class="panel anim-rise" style="--i: 1">
+    <h2>Two ways in</h2>
+    <p>
+      Avanyam authenticates through the corporate identity provider. Staff accounts
+      from the company directory can use single sign-on and will be sent there.
+    </p>
+    <p>
+      Trainees registered through this portal sign in with the email and password
+      their trainer approved.
+    </p>
+    <div class="rule"></div>
+    <p class="small">
+      Repeated failed attempts lock the account temporarily. If you are locked out,
+      contact your trainer rather than retrying &mdash; the wait grows with each failure.
+    </p>
+  </aside>
+
+</div>
+{% endblock %}

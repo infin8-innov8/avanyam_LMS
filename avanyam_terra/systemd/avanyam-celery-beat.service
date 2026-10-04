@@ -1,0 +1,50 @@
+# avanyam_terra — Celery beat scheduler (K8, PREPARED BUT NOT ENABLED).
+#
+# STATUS: template only. NOT enabled, NOT started.
+#
+# WHY A SEPARATE UNIT FOR BEAT
+# Beat is a scheduler, not a worker: it must run as exactly ONE process or every
+# periodic task fires once per replica. Keeping it as its own unit with its own
+# singleton identity makes that visible instead of relying on operators to
+# remember. This is why it does not share the worker unit.
+#
+# IT IS NOT REDUNDANT WITH PG CRON
+#   - PostgreSQL cron (vm_cron in avanyam_aero) handles DB-side retention:
+#     WAL archiving bookkeeping, autovacuum nudges, stats resets.
+#   - Celery beat handles application-side schedules: submission windows,
+#     reminder emails, enrolment expiry, certificate renewal.
+# Different concerns, different failure modes, different places to look.
+
+[Unit]
+Description=avanyam Celery beat scheduler (singleton)
+Documentation=file:///home/rupesh/avanyam_lms/avanyam_terra/DEPLOYMENT.md
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+Requires=redis-server.service
+
+[Service]
+Type=simple
+User=avanyam
+Group=avanyam
+WorkingDirectory=/opt/avanyam/current
+
+Environment=DJANGO_SETTINGS_MODULE=avanyam.settings.production
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/etc/avanyam/celery.env
+
+# --pidfile guards against a second beat sneaking in: if the pidfile exists and
+# the process is alive, the new one refuses to start. That turns "we accidentally
+# started beat twice" from silent duplicate schedule firing into a failed start.
+ExecStart=/opt/avanyam/venv/bin/celery -A avanyam beat \
+    --loglevel=INFO \
+    --schedule=/var/lib/avanyam/celerybeat-schedule \
+    --pidfile=/run/avanyam/celerybeat.pid
+
+# SIGTERM, not SIGKILL, so in-flight scheduled sends drain rather than cut off.
+KillSignal=SIGTERM
+TimeoutStopSec=120
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

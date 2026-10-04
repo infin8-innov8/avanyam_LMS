@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en"><body style="margin:0;padding:24px;background:#f4f6fa;
+  font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#0d1424">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e4e8f0;
+              border-radius:16px;padding:24px">
+    <p style="margin:0 0 4px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+              font-weight:600;color:{% if approved %}#157347{% elif redirected %}#c25e08{% else %}#b3261e{% endif %}">
+      {% if approved %}Registration approved{% elif redirected %}Not approved this time{% else %}Registration declined{% endif %}</p>
+    <h1 style="font-size:24px;margin:0 0 16px">
+      {% if approved %}You are in{% elif redirected %}Try a different trainer{% else %}Not approved{% endif %}</h1>
+
+    <p style="margin:0 0 16px">Hello {{ request.full_name }},</p>
+
+    {% if approved %}
+      <p style="margin:0 0 20px">
+        {{ decided_by.full_name }} approved your registration. Sign in to begin.
+      </p>
+      <p style="margin:0 0 20px">
+        <a href="{{ login_url }}" style="display:inline-block;background:#c25e08;color:#fff;
+           text-decoration:none;font-weight:600;padding:11px 18px;border-radius:10px">
+          Sign in to Avanyam LMS</a>
+      </p>
+
+    {% elif redirected %}
+      <p style="margin:0 0 16px">
+        {{ decided_by.full_name }} did not approve this application, but you are
+        welcome to register again &mdash; quite possibly with a different trainer.
+      </p>
+      <p style="margin:0 0 16px;color:#5a6a86">
+        Reason: {{ request.decision_note|default:"not supplied" }}
+      </p>
+      <p style="margin:0 0 20px">
+        <a href="{{ signup_url }}" style="display:inline-block;background:#c25e08;color:#fff;
+           text-decoration:none;font-weight:600;padding:11px 18px;border-radius:10px">
+          Register again</a>
+      </p>
+      <p style="margin:0;color:#5a6a86;font-size:13px">
+        Your previous password no longer works, because the account was closed when
+        the application was declined. Choose a new one when you register.
+      </p>
+
+    {% else %}
+      <p style="margin:0 0 16px">
+        {{ decided_by.full_name }} did not approve your registration.
+      </p>
+      <p style="margin:0 0 16px;color:#5a6a86">
+        Reason: {{ request.decision_note|default:"not supplied" }}
+      </p>
+      <p style="margin:0;color:#5a6a86;font-size:13px">
+        This address cannot register again. If you think this is a mistake, contact
+        the trainer you selected rather than registering again &mdash; they can reverse
+        the decision.
+      </p>
+    {% endif %}
+  </div>
+</body></html>

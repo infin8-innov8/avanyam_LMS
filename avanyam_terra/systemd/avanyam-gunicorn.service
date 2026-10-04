@@ -1,0 +1,115 @@
+# avanyam_terra — Gunicorn systemd unit (K8, PREPARED BUT NOT ENABLED).
+#
+# STATUS: template only. There is no application code yet — no manage.py, no
+# Django settings module, no src/. This unit is deliberately NOT enabled and NOT
+# started. Enabling it now would produce a restart loop and, worse, would make
+# `systemctl is-active avanyam-gunicorn` a misleading signal about whether the
+# app is deployed.
+#
+# To activate once the application lands:
+#   1. cp src/manage.py into place and make `./manage.py check` pass
+#   2. set DJANGO_SETTINGS_MODULE and the environment file path below
+#   3. sudo cp avanyam_terra/systemd/avanyam-gunicorn.service /etc/systemd/system/
+#   4. sudo systemctl daemon-reload && sudo systemctl enable --now avanyam-gunicorn
+#
+# ## WORKER COUNT
+# #
+# avanyam_intro.txt L1251: VM1 is sized for request handling and specifies
+# "2 Gunicorn" workers for the VM1 profile. On the 4 vCPU VM1 target that is
+# deliberately conservative rather than the usual 2*cores+1:
+#
+#   - The box also runs Celery workers, nginx and Redis, so cores are shared.
+#   - Celery fan-out plus Gunicorn on the same 4 vCPU is the connection
+#     exhaustion path called out at L162. More Gunicorn workers make that worse,
+#     not better, because each worker can hold a DB connection.
+#   - Requests here are mostly I/O bound on PostgreSQL and S3, so extra workers
+#     add context-switching and connection pressure without adding throughput.
+#
+# Each sync worker can hold one DB connection, so workers + Celery prefork
+# children + the migrate/beat processes must stay under the PgBouncer pool
+# ceiling. The arithmetic is recorded in avanyam_terra/memory.md §POOL-SIZING.
+#
+# NOTE: this laptop has 4 vCPU but only ~3.8 GiB usable RAM (shared with the
+# desktop session and clamd's ~973 MB), so these values are NOT what was load
+# tested here. They are the spec's VM1 numbers awaiting a real VM1.
+
+[Unit]
+Description=avanyam Gunicorn (application tier)
+Documentation=file:///home/rupesh/avanyam_lms/avanyam_terra/DEPLOYMENT.md
+After=network-online.target postgresql.service redis-server.service nginx.service
+Wants=network-online.target
+# Do NOT require Postgres. If PostgreSQL is down, Gunicorn should still start and
+# serve 503s for database-backed routes; refusing to start turns a partial outage
+# into a total one.
+Requires=redis-server.service
+# Unlimited start attempts: a crash-looping app should keep retrying and be
+# visible as failed in systemctl, not hit the default 5-restarts-in-10s limit and
+# enter a permanently dead 'failed' state that masks the real error.
+StartLimitIntervalSec=0
+
+[Service]
+Type=notify
+# systemd-notify: Gunicorn sends READY=1 only after the master is bound, so
+# systemd does not report "active" before the socket can actually serve.
+# --graceful-timeout must exceed nginx's proxy_read_timeout (60s) or systemd will
+# kill in-flight requests during a restart.
+User=avanyam
+Group=avanyam
+WorkingDirectory=/opt/avanyam/current
+
+Environment=DJANGO_SETTINGS_MODULE=avanyam.settings.production
+Environment=PYTHONUNBUFFERED=1
+# Refuse to start if a secret is missing rather than booting with a default.
+# A missing DJANGO_SECRET_KEY must fail loudly at startup, not at first request.
+EnvironmentFile=/etc/avanyam/gunicorn.env
+
+ExecStart=/opt/avanyam/venv/bin/gunicorn avanyam.wsgi:application \
+    --bind 127.0.0.1:8000 \
+    --workers 2 \
+    --worker-class sync \
+    --threads 4 \
+    --timeout 60 \
+    --graceful-timeout 75 \
+    --keep-alive 5 \
+    --max-requests 2000 \
+    --max-requests-jitter 200 \
+    --access-logfile - \
+    --error-logfile - \
+    --capture-output
+
+ExecReload=/bin/kill -s HUP $MAINPID
+KillSignal=SIGQUIT
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=90
+
+# ---- hardening ----
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RemoveIPC=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0027
+
+# Only these are writable. Everything else in the filesystem is read-only, so a
+# compromised worker cannot drop a binary or edit application code.
+ReadWritePaths=/opt/avanyam/current/log /opt/avanyam/current/media /var/lib/avanyam
+
+[Install]
+WantedBy=multi-user.target

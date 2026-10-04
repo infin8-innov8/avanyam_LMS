@@ -1,0 +1,128 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en" class="{% block html_class %}no-js{% endblock %}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="same-origin">
+  <title>{% block title %}Avanyam LMS{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'css/avanyam.css' %}">
+  <script>document.documentElement.className = document.documentElement.className.replace(/\bno-js\b/, "js");</script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="masthead">
+    <a class="wordmark" href="{% url 'accounts:pending' %}">
+      <span>Avanyam</span>
+      <span class="dot" aria-hidden="true"></span>
+      <span class="tag">Learning &amp; Development</span>
+    </a>
+    <nav aria-label="Primary">
+      {% if user.is_authenticated %}
+        <a href="{% url 'accounts:pending' %}">My account</a>
+        {% if user.is_trainer %}
+          <a href="{% url 'accounts:trainer-queue' %}">Approvals</a>
+        {% endif %}
+        <form class="inline-form" method="post" action="{% url 'accounts:logout' %}">
+          {% csrf_token %}
+          <button class="btn btn--ghost" type="submit">Sign out</button>
+        </form>
+      {% else %}
+        <a href="{% url 'accounts:login' %}">Sign in</a>
+        <a class="btn btn--primary" href="{% url 'accounts:signup' %}">Register</a>
+      {% endif %}
+    </nav>
+  </header>
+
+  <main id="main" class="shell anim-rise {% block shell_class %}{% endblock %}">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% comment %}
+    Toasts are the single place server-side feedback appears, so every screen
+    gets the same behaviour for free.
+
+    NOTE: this has to be a comment block tag rather than a single-brace
+    comment. Django's single-brace comment is not DOTALL, so a newline inside
+    it makes the lexer give up and emit the whole block as literal text on
+    every page. That bug shipped once already, and was reintroduced once while
+    fixing it; test_the_page_never_leaks_a_template_comment pins it.
+
+    Two sources feed it:
+
+    * `messages` -- session messages raised by views (approval outcomes, "your
+      account is not approved", forced password change).
+    * `form` -- this page's own bound form. A field error is already rendered
+      inline by the form template; the toast repeats it so it is noticed
+      without scrolling.
+
+    Both are marked data-toast--persistent when they carry an error or a
+    warning. A message the user still has to act on must not scroll away
+    because they were slow to look at it: it stays until dismissed or the page
+    changes. Confirmations ("Approved.") are transient and do drain.
+
+    Everything is server-rendered and visible with JavaScript disabled: without
+    JS the toast stays put instead of draining away. The .js class on <html> is
+    what switches the countdown on, so the animation never starts for a browser
+    that cannot dismiss anything.
+  {% endcomment %}
+  {% if messages or form.errors %}
+    <div class="toasts" id="toasts">
+      {% for message in messages %}
+        <div class="toast toast--{{ message.tags|default:'info' }}"
+             {% if message.tags == 'error' %}role="alert"{% else %}role="status"{% endif %}
+             {% if message.tags == 'error' or message.tags == 'warning' %}data-toast--persistent{% endif %}
+             data-toast>
+          <p class="toast__text">{{ message }}</p>
+          <button class="toast__close" type="button" data-toast-close
+                  aria-label="Dismiss">&times;</button>
+          <span class="toast__timer" aria-hidden="true"></span>
+        </div>
+      {% endfor %}
+      {% if form.errors %}
+        <div class="toast toast--bad" role="alert" data-toast data-toast--persistent>
+          <p class="toast__text">
+            {% if form.non_field_errors %}
+              {{ form.non_field_errors.0 }}
+            {% else %}
+              Please correct the highlighted {{ form.errors|length }} field{{ form.errors|length|pluralize }} below.
+            {% endif %}
+          </p>
+          <button class="toast__close" type="button" data-toast-close
+                  aria-label="Dismiss">&times;</button>
+          <span class="toast__timer" aria-hidden="true"></span>
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% comment %}
+    Confirmation dialog.
+
+    Built on the native <dialog> element rather than a div with role="dialog":
+    showModal() gives focus trapping, Esc-to-close and inertness of the page
+    behind it for free, all of which a hand-rolled version has to reimplement
+    and usually gets wrong.
+
+    The buttons are filled in by portal.js from the clicked button's
+    data-confirm-* attributes. Empty by default, because a dialog with template
+    placeholder text in it is worse than no dialog.
+  {% endcomment %}
+  <dialog class="confirm" id="confirm-dialog"
+          aria-labelledby="confirm-title" aria-describedby="confirm-body">
+    <h2 class="confirm__title" id="confirm-title"></h2>
+    <p class="confirm__body" id="confirm-body"></p>
+    <div class="confirm__actions">
+      <button class="btn btn--ghost" type="button" data-confirm-cancel>Cancel</button>
+      <button class="btn btn--primary" type="button" data-confirm-accept></button>
+    </div>
+  </dialog>
+
+  <script src="{% static 'js/portal.js' %}" defer></script>
+
+  <footer class="footer">
+    <p>Avanyam LMS &middot; accounts are reviewed by your trainer before access is granted.</p>
+  </footer>
+</body>
+</html>

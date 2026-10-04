@@ -1,0 +1,97 @@
+# avanyam_terra — Celery "fast" worker (K8, PREPARED BUT NOT ENABLED).
+#
+# STATUS: template only, for the same reason as avanyam-gunicorn.service: there is
+# no application code yet. NOT enabled, NOT started.
+#
+# ## QUEUE ROUTING
+# The spec splits work across two tiers: Celery "fast" on VM1 (the app box) and
+# Celery "bulk"/transcoding on VM3 (avanyam_aqua). Splitting by queue rather than
+# by one giant worker pool is the whole point — it keeps video transcodes from
+# starving interactive requests.
+#
+#   VM1  celery-fast  : hls_package (orchestration + probe), email, notifications
+#   VM3  celery-bulk  : actual transcode/encode (CELERY_BULK_CONCURRENCY=2)
+#
+# This unit consumes ONLY "fast". A fast worker that also listens to "bulk" would
+# happily pick up a 20-minute transcode on the request-handling box, which is
+# precisely the failure the two-VM split exists to prevent.
+#
+# ## CONCURRENCY
+# prefork, concurrency=2. Two reasons, both from the spec:
+#   - VM1 is 4 vCPU shared with Gunicorn, nginx and Redis (L1251, L1263-1264).
+#   - Video work is capped at 2 on VM3 rather than using all cores precisely
+#     because a transcode saturating every core starves everything else (L1263).
+#     The fast queue keeps that same discipline.
+
+[Unit]
+Description=avanyam Celery worker (fast queue, application tier)
+Documentation=file:///home/rupesh/avanyam_lms/avanyam_terra/DEPLOYMENT.md
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+Requires=redis-server.service
+# Unlimited start attempts: a crash-looping app should keep retrying and be
+# visible as failed in systemctl, not hit the default 5-restarts-in-10s limit and
+# enter a permanently dead 'failed' state that masks the real error.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=avanyam
+Group=avanyam
+WorkingDirectory=/opt/avanyam/current
+
+Environment=DJANGO_SETTINGS_MODULE=avanyam.settings.production
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/etc/avanyam/celery.env
+
+# -Q fast restricts this worker to the fast queue. Without it a worker will
+# consume "bulk" tasks and pull transcoding onto the app VM.
+# --concurrency=2 matches the concurrency-capped philosophy in the spec.
+# Without --without-gossip --without-mingle this worker will try to join the
+# celery.events gossip/mingle protocol, which is pure overhead and startup
+# latency for a 2-worker deployment.
+# --max-tasks-per-child recycles workers to bound memory growth from long-lived
+# tasks; a leaked reference in one task should not accumulate forever.
+ExecStart=/opt/avanyam/venv/bin/celery -A avanyam worker \
+    --loglevel=INFO \
+    --concurrency=2 \
+    --queues=fast \
+    --without-gossip --without-mingle \
+    --max-tasks-per-child=200 \
+    --prefetch-multiplier=1
+
+ExecReload=/bin/kill -s HUP $MAINPID
+KillSignal=SIGTERM
+# Celery needs time to finish in-flight tasks. Must exceed the longest task in
+# the fast queue or a restart silently drops work.
+TimeoutStopSec=300
+Restart=on-failure
+RestartSec=10
+
+# ---- hardening (same posture as the Gunicorn unit) ----
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RemoveIPC=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0027
+ReadWritePaths=/opt/avanyam/current/log /opt/avanyam/current/media /var/lib/avanyam
+
+[Install]
+WantedBy=multi-user.target

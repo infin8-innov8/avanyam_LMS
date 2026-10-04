@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Registration closed &middot; Avanyam LMS{% endblock %}
+{% block shell_class %}shell--narrow{% endblock %}
+{% block content %}
+<div class="card">
+  <p class="eyebrow">Registration closed</p>
+  <h1>New registrations are paused</h1>
+  <p class="lede">
+    Access is granted by trainer approval only, and registration is currently switched
+    off. Existing accounts are unaffected.
+  </p>
+  <p class="muted">Need access? Email <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
+  <p><a class="btn btn--ghost" href="{% url 'accounts:login' %}">Back to sign in</a></p>
+</div>
+{% endblock %}

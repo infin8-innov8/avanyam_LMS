@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}My account &middot; Avanyam LMS{% endblock %}
+{% block shell_class %}shell--narrow{% endblock %}
+
+{% block content %}
+<div class="card">
+  <p class="eyebrow">My account</p>
+  <h1>{{ user_obj.full_name }}</h1>
+  <p class="muted small">{{ user_obj.email }}</p>
+
+  {% if user_obj.must_change_password %}
+    <div class="note note--warn" role="alert">
+      <strong>Set your own password.</strong> The password you were given is temporary and
+      shared with nobody else, but it is derived from your name and is therefore easy to
+      guess. Change it before you continue.
+      <p style="margin-top: var(--sp-2);">
+        <a class="btn btn--primary" href="{% url 'accounts:password-change' %}">Choose a new password</a>
+      </p>
+    </div>
+  {% endif %}
+
+  {% if is_approved %}
+    <div class="note note--ok" role="status">
+      Your account is <strong>approved</strong>. Content and courses are unlocked.
+    </div>
+    <h2>Next</h2>
+    <p class="muted">Course catalogue and enrolments arrive in the next milestone.</p>
+  {% else %}
+    <div class="note note--warn" role="status">
+      Your account is <strong>{{ user_obj.approval_status }}</strong>. Access is locked
+      until your trainer approves it.
+    </div>
+    {% if trainer %}
+      <p>
+        Your trainer is <strong>{{ trainer.full_name }}</strong>
+        <span class="muted">({{ trainer.email }})</span>.
+        They have been notified by email.
+      </p>
+    {% else %}
+      <p>
+        No trainer is assigned yet. An administrator will set this up, or you can
+        <a href="{% url 'accounts:signup' %}">submit a request</a> naming your trainer.
+      </p>
+    {% endif %}
+    <p class="muted small">
+      Declined or waiting? Email notifications go to the address above, so check the spam
+      folder before asking again.
+    </p>
+  {% endif %}
+</div>
+{% endblock %}

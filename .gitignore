@@ -1,0 +1,70 @@
+# ── Secrets ────────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# NOTE ON ANCHORING: a pattern with a slash anywhere but the end is anchored to
+# the .gitignore's own directory. `run/*` therefore matches only a top-level
+# ./run, never avanyam_aero/run -- which is how a live Keycloak admin password
+# and the Redis password ended up staged. The leading `**/` is what makes these
+# match at any depth. (A bare `data/` needs no `**/` because its slash is trailing.)
+
+# Runtime state: generated secrets and pid/socket files.
+**/run/*
+!**/run/.gitkeep
+**/conf/*.env
+**/conf/**/secrets*
+data/
+logs/
+opt/
+.avanyam_*_venv/
+*.pid
+*.sock
+
+# ── Python ─────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ── Media / DB artefacts ───────────────────────────────────────────────────
+*.m3u8
+*.ts
+*.m4s
+*.dump
+
+# Object storage. conf/s3.json holds real S3 access keys -- committing it would
+# publish write access to every trainee upload and audit artefact.
+avanyam_aqua/data/seaweedfs/
+**/conf/s3.json
+
+# SeaweedFS security: holds the SSE-S3 KEK and filer signing key (K9)
+avanyam_aqua/data/seaweedfs/conf/security.toml
+avanyam_aqua/data/seaweedfs/conf/sse.env
+
+# Local dev TLS: CA private key and leaf key must never be committed
+avanyam_terra/conf/tls/
+
+# ── Not source: derived or regenerable after configuration ──────────────────
+# Project documentation. Regenerated from the code and the decisions recorded in
+# it; the repo carries the code that these describe, not the prose.
+*.md
+
+# Briefs and the VM architecture PDF are authored documents, not inputs to a build.
+avanyam_*.txt
+*.pdf
+
+# Editor / OS noise
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Local artefacts that predate the rules above
+memory.md
+tasks.md

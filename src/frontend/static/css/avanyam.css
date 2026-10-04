@@ -1,0 +1,723 @@
+/* Avanyam portal styles. Tokens come from src/tokens.css. */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--step-0);
+  line-height: 1.6;
+  color: var(--ink-900);
+  background:
+    radial-gradient(1100px 520px at 88% -8%, rgba(226, 118, 12, 0.10), transparent 62%),
+    radial-gradient(760px 420px at 4% 4%, rgba(42, 55, 82, 0.10), transparent 60%),
+    var(--ink-050);
+  min-height: 100vh;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.18;
+  margin: 0 0 var(--sp-3);
+}
+
+h1 { font-size: var(--step-4); }
+h2 { font-size: var(--step-2); }
+h3 { font-size: var(--step-1); }
+
+a { color: var(--accent-700); }
+a:hover { color: var(--accent-600); }
+
+:focus-visible {
+  outline: 2px solid var(--accent-600);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--ink-900);
+  color: #fff;
+  padding: var(--sp-3) var(--sp-4);
+  z-index: 100;
+}
+.skip-link:focus { left: var(--sp-4); top: var(--sp-4); }
+
+/* ---------------------------------------------------------------- masthead */
+
+.masthead {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--ink-100);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(6px);
+}
+
+.wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  font-weight: 600;
+  color: var(--ink-900);
+  text-decoration: none;
+}
+
+.wordmark .dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--accent-500);
+  display: inline-block;
+  transform: translateY(-2px);
+}
+
+.wordmark .tag {
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  font-weight: 500;
+  color: var(--ink-400);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.masthead nav { margin-left: auto; display: flex; gap: var(--sp-4); align-items: center; }
+.masthead nav a { text-decoration: none; font-weight: 500; }
+.masthead nav a:hover { text-decoration: underline; }
+
+/* ------------------------------------------------------------------ layout */
+
+.shell { max-width: 1100px; margin: 0 auto; padding: var(--sp-6) var(--sp-5) var(--sp-7); }
+.shell--narrow { max-width: 720px; }
+
+.split {
+  display: grid;
+  gap: var(--sp-6);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 62rem) {
+  .split { grid-template-columns: 1.05fr 0.95fr; align-items: start; }
+}
+
+/* ------------------------------------------------------------------- cards */
+
+.card {
+  background: #fff;
+  border: 1px solid var(--ink-100);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  padding: var(--sp-5);
+}
+
+.card--flush { padding: 0; overflow: hidden; }
+
+.card__header {
+  padding: var(--sp-5);
+  border-bottom: 1px solid var(--ink-100);
+}
+
+.eyebrow {
+  font-size: var(--step--1);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-700);
+  margin: 0 0 var(--sp-2);
+}
+
+.lede { color: var(--ink-600); margin: 0 0 var(--sp-4); }
+
+.muted { color: var(--ink-400); }
+.small { font-size: var(--step--1); }
+
+/* ------------------------------------------------------------------- forms */
+
+.field { margin-bottom: var(--sp-4); }
+
+.field label {
+  display: block;
+  font-weight: 600;
+  font-size: var(--step--1);
+  margin-bottom: var(--sp-2);
+  color: var(--ink-800);
+}
+
+.field .hint {
+  display: block;
+  font-size: var(--step--1);
+  color: var(--ink-400);
+  margin-top: var(--sp-1);
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+select,
+textarea {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+  font-size: var(--step-0);
+  color: var(--ink-900);
+  background: #fff;
+  border: 1px solid var(--ink-100);
+  border-radius: var(--radius);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+input:hover, select:hover { border-color: var(--ink-300); }
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent-500);
+  box-shadow: var(--ring);
+}
+
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%235a6a86' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  padding-right: 2.25rem;
+}
+
+.field--error input,
+.field--error select { border-color: var(--bad-600); }
+
+.errorlist {
+  list-style: none;
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  color: var(--bad-600);
+  font-size: var(--step--1);
+  font-weight: 500;
+}
+
+.field-row { display: grid; gap: var(--sp-4); grid-template-columns: 1fr; }
+@media (min-width: 40rem) { .field-row { grid-template-columns: 1fr 1fr; } }
+
+/* ----------------------------------------------------------------- buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: 0.72rem 1.15rem;
+  font: inherit;
+  font-weight: 600;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.05s, box-shadow 0.15s, background-color 0.15s;
+}
+
+.btn:active { transform: translateY(1px); }
+
+.btn--primary { background: var(--accent-600); color: #fff; }
+.btn--primary:hover { background: var(--accent-700); color: #fff; }
+
+.btn--ghost {
+  background: #fff;
+  color: var(--ink-800);
+  border-color: var(--ink-100);
+}
+.btn--ghost:hover { border-color: var(--ink-300); color: var(--ink-900); }
+
+.btn--approve { background: var(--ok-600); color: #fff; }
+.btn--approve:hover { background: #0f5c39; color: #fff; }
+
+.btn--reject { background: #fff; color: var(--bad-600); border-color: var(--bad-600); }
+.btn--reject:hover { background: var(--bad-100); }
+
+/* Filled, unlike .btn--reject. Used to confirm a decline, where the action being
+   taken is destructive and should look like it on the button the trainer is about
+   to press -- not like the neutral "Cancel" beside it. */
+.btn--reject-solid { background: var(--bad-600); color: #fff; border-color: var(--bad-600); }
+.btn--reject-solid:hover { background: #8f1e18; color: #fff; }
+
+/* "Decline but let them try again" is a decline, so it shares .btn--reject's
+   outline -- but in amber, not red. Three red buttons in a row would train
+   trainers to read none of them, and this one leaves the applicant able to
+   register. The colour is the difference. */
+.btn--reject-soft { background: #fff; color: var(--warn-600); border-color: var(--warn-600); }
+.btn--reject-soft:hover { background: var(--warn-100); }
+
+/* Undo is corrective, not destructive, so it reads in ink rather than red --
+   a trainer reversing their own mistake should not be warned like an attacker. */
+.btn--undo { background: #fff; color: var(--ink-700); border-color: var(--ink-300); }
+.btn--undo:hover { background: var(--ink-050); color: var(--ink-900); }
+
+.btn--block { width: 100%; }
+
+/* ------------------------------------------------------------------ notes */
+
+.note {
+  border-radius: var(--radius);
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--step--1);
+  border: 1px solid transparent;
+  margin-bottom: var(--sp-4);
+}
+.note--ok { background: var(--ok-100); color: var(--ok-600); border-color: #bfe3d0; }
+.note--warn { background: var(--warn-100); color: var(--warn-600); border-color: #f0d9ad; }
+.note--bad { background: var(--bad-100); color: var(--bad-600); border-color: #f3c6c2; }
+.note--info { background: var(--ink-050); color: var(--ink-700); border-color: var(--ink-100); }
+
+/* ------------------------------------------------------------------ badges */
+
+.badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+}
+.badge--pending { background: var(--warn-100); color: var(--warn-600); }
+.badge--approved { background: var(--ok-100); color: var(--ok-600); }
+.badge--rejected { background: var(--bad-100); color: var(--bad-600); }
+.badge--redirected { background: var(--warn-100); color: var(--warn-600); }
+.badge--suspended { background: var(--ink-100); color: var(--ink-600); }
+
+/* ------------------------------------------------------------------- queue */
+
+.queue { list-style: none; margin: 0; padding: 0; }
+
+.queue__item {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--ink-100);
+}
+.queue__item:last-child { border-bottom: 0; }
+
+.queue__who { font-weight: 600; }
+.queue__meta { font-size: var(--step--1); color: var(--ink-400); }
+
+.queue__actions {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.inline-form { display: inline; }
+
+/* -------------------------------------------------------------- side panel */
+
+.panel {
+  background: var(--ink-900);
+  color: var(--ink-100);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-5);
+  box-shadow: var(--shadow-2);
+}
+.panel h2 { color: #fff; }
+.panel ol { padding-left: var(--sp-5); margin: 0 0 var(--sp-4); }
+.panel li { margin-bottom: var(--sp-3); }
+.panel strong { color: #fff; }
+.panel .rule {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.14);
+  margin: var(--sp-4) 0;
+}
+.panel a { color: var(--accent-400); }
+
+.footer {
+  padding: var(--sp-5);
+  text-align: center;
+  color: var(--ink-400);
+  font-size: var(--step--1);
+}
+
+/* ==========================================================================
+   Motion
+   ==========================================================================
+   Transitions are deliberately short (120-200ms) and entrance animations are
+   single-pass. Long or looping motion reads as decoration, which is wrong for
+   a system people use all day.
+
+   Everything here sits inside `@media (prefers-reduced-motion: no-preference)`,
+   so a user who has asked their OS to reduce motion gets none of it. That is
+   not optional -- `prefers-reduced-motion` is the only reliable signal for
+   vestibular sensitivity, and honouring it costs one wrapper.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  @keyframes fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* Staggered entrance: --i is set inline per element, so the delay is
+     declarative and survives a template edit that reorders the markup. */
+  .anim-rise {
+    animation: rise 0.42s cubic-bezier(0.22, 0.68, 0.35, 1) both;
+    animation-delay: calc(var(--i, 0) * 60ms);
+  }
+
+  .anim-fade { animation: fade 0.3s ease both; }
+
+  /* Progress bar on the trainer queue: a queued item's status becoming
+     approved should feel like the row advancing, not the page changing. */
+  .queue__item {
+    animation: fade 0.25s ease both;
+  }
+
+  .badge--approved { animation: fade 0.4s ease both; }
+
+  /* Sheen on the primary action only, and only on hover. */
+  .btn--primary { position: relative; overflow: hidden; }
+
+  .btn--primary::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      100deg,
+      transparent 20%,
+      rgba(255, 255, 255, 0.22) 50%,
+      transparent 80%
+    );
+    transform: translateX(-100%);
+  }
+
+  .btn--primary:hover::after { animation: sheen 0.65s ease; }
+
+  @keyframes sheen {
+    to { transform: translateX(100%); }
+  }
+
+  /* Respect a user's request for less motion, even mid-session. */
+  @media (prefers-reduced-motion: reduce) {
+    .anim-rise, .anim-fade, .queue__item, .badge--approved { animation: none; }
+    .btn--primary::after { display: none; }
+    * { transition-duration: 0.01ms !important; }
+  }
+}
+
+/* Busy state for submit buttons. Pure CSS because a form submit must not
+   depend on JS having loaded -- the server-side flow works either way. */
+.btn[aria-busy="true"] { pointer-events: none; opacity: 0.75; }
+.btn[aria-busy="true"]::before {
+  content: "";
+  width: 1em; height: 1em;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Field-level validation feedback, only once the field has been touched. */
+.field--invalid input, .field--invalid select { border-color: var(--bad-600); }
+.field--valid input, .field--valid select { border-color: var(--ok-600); }
+
+/* ------------------------------------------------------------------ toasts
+
+   Transient feedback for anything the server reports back through the
+   messages framework or a form's error list. The rule that shaped this: a
+   toast may be the thing that *grabs attention*, but it must never be the only
+   copy of a message the user still has to act on.
+
+   Field-level validation errors therefore stay rendered inline in the form
+   (signup.html, login.html) AND get a toast summary. Dismissing the toast loses
+   nothing, because the authoritative copy is still on the page. Purely
+   transient things -- "Application approved." -- live only in the toast.
+
+   `--toast-ms` is the one place the duration is defined. The progress bar
+   animates against it and the dismissal timer reads it back out, so the visible
+   countdown and the actual removal cannot drift apart. */
+/* Centred on the inline axis, pinned to the top of the viewport.
+
+   It used to sit in the top-right corner, which put it directly on top of the
+   nav's own controls -- the Sign out button was underneath it. A centred column
+   leaves both nav edges clear on a wide screen, and `margin-inline: auto` is used
+   rather than `translateX(-50%)` so it cannot fight the children's entrance
+   animation, which does use transform. */
+.toasts {
+  position: fixed;
+  inset-block-start: var(--sp-4);
+  inset-inline: 0;
+  margin-inline: auto;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  width: min(26rem, calc(100vw - 2 * var(--sp-4)));
+  /* The stack must never swallow clicks meant for the page beneath it; each
+     toast opts back in. This is what keeps a centred toast from blocking the
+     buttons behind it while it is on screen. */
+  pointer-events: none;
+}
+
+.toast {
+  --toast-ms: 6000ms;
+  position: relative;
+  overflow: hidden;
+  pointer-events: auto;
+  padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + 2px);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: var(--ink-050);
+  color: var(--ink-700);
+  box-shadow: var(--shadow-2);
+  font-size: var(--step--1);
+}
+
+.toast--ok   { background: var(--ok-100);   color: var(--ok-600);   border-color: #bfe3d0; }
+.toast--warn { background: var(--warn-100); color: var(--warn-600); border-color: #f0d9ad; }
+.toast--bad  { background: var(--bad-100);  color: var(--bad-600);  border-color: #f3c6c2; }
+.toast--info { background: var(--ink-050);  color: var(--ink-700);  border-color: var(--ink-100); }
+
+.toast__text { margin: 0; padding-inline-end: var(--sp-5); }
+
+.toast__close {
+  position: absolute;
+  inset-block-start: var(--sp-2);
+  inset-inline-end: var(--sp-2);
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.toast__close:hover { background: rgb(13 20 36 / 0.08); }
+.toast__close:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+
+/* The countdown. A track that fills, drained left-to-right by a scaleX
+   animation, so the remaining time is legible at a glance rather than implied
+   by the toast simply vanishing. */
+.toast__timer {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  block-size: 3px;
+  background: currentColor;
+  opacity: 0.28;
+  transform-origin: left center;
+}
+
+.js .toast__timer { animation: toast-drain var(--toast-ms) linear forwards; }
+.js .toast.is-paused .toast__timer { animation-play-state: paused; }
+.js .toast.is-leaving { animation: toast-out 180ms ease-in forwards; }
+
+@keyframes toast-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@keyframes toast-out {
+  to { opacity: 0; transform: translateY(calc(-1 * var(--sp-2))); }
+}
+
+/* Arrival. Only a short rise -- the toast has already done its job by existing,
+   so the motion stops rather than competing with the countdown for attention. */
+.js .toast { animation: toast-in 180ms ease-out backwards; }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(calc(-1 * var(--sp-2))); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .js .toast, .js .toast__timer, .js .toast.is-leaving { animation: none; }
+  /* The drain is information, not decoration: it still has to shrink in step
+     with the timer, so it keeps animating while the slide/fade does not. */
+  .js .toast__timer { animation: toast-drain var(--toast-ms) linear forwards; }
+  .js .toast.is-paused .toast__timer { animation-play-state: paused; }
+}
+
+@media (width <= 40rem) {
+  .toasts {
+    inset-block: auto var(--sp-4);
+    inset-inline: var(--sp-3);
+    width: auto;
+  }
+}
+
+/* ------------------------------------------------------- approval queue tabs
+
+   The queue is a decision surface, so "what needs me" and "what already
+   happened" are separated by a tab rather than by scrolling. The count sits in
+   the tab because the number is the reason to click it. */
+.tabs {
+  display: flex;
+  gap: var(--sp-1);
+  padding: 0 var(--sp-5);
+  border-bottom: 1px solid var(--ink-100);
+  overflow-x: auto;
+}
+
+.tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-3);
+  border-bottom: 2px solid transparent;
+  color: var(--ink-600);
+  font-size: var(--step--1);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.tabs__tab:hover { color: var(--ink-900); border-bottom-color: var(--ink-300); }
+.tabs__tab.is-current { color: var(--ink-900); border-bottom-color: var(--accent-600); }
+.tabs__tab:focus-visible { outline: 2px solid var(--accent-600); outline-offset: -2px; }
+
+.tabs__count {
+  min-inline-size: 1.5rem;
+  padding-inline: var(--sp-1);
+  border-radius: 999px;
+  background: var(--ink-100);
+  color: var(--ink-600);
+  font-size: var(--step--1);
+  text-align: center;
+}
+.tabs__tab.is-current .tabs__count { background: var(--accent-100); color: var(--accent-700); }
+
+/* The count is the reason to click, so a tab with nothing behind it is not
+   rendered at all. Should one survive anyway, it must not read as actionable. */
+.tabs__count:empty, .tabs__tab[aria-disabled="true"] { opacity: 0.55; }
+
+/* An application: details on the left, the decision on the right. */
+.queue__body { min-inline-size: 0; }
+
+.queue__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  align-items: flex-start;
+  padding: var(--sp-3);
+  border: 1px solid var(--ink-100);
+  border-radius: var(--radius);
+  background: var(--ink-050);
+}
+
+.queue__buttons { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.queue__actions input[type="text"] { inline-size: 100%; }
+
+/* The two undo forms sit side by side on wide screens and stack on narrow ones.
+   `flex-wrap` does the responsive part, so there is no breakpoint to keep in
+   sync with the queue grid above. */
+.queue__actions form { margin: 0; }
+.queue__undo-form { inline-size: 100%; }
+.queue__undo-row { display: flex; gap: var(--sp-2); align-items: center; }
+.queue__undo-row input[type="text"] {
+  inline-size: 8ch;
+  flex: 0 0 auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--step-0);
+  letter-spacing: 0.15em;
+  text-align: center;
+}
+.queue__undo-form label { display: block; margin-block-end: var(--sp-1); }
+
+.queue__empty { padding: var(--sp-6) var(--sp-5); text-align: center; }
+.queue__empty-title { margin: 0 0 var(--sp-1); font-weight: 600; }
+.queue__empty p { margin-block: 0; }
+
+@media (width >= 52rem) {
+  .queue__item { grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem); align-items: start; }
+  .queue__actions { align-self: start; }
+}
+
+/* ------------------------------------------------------------- confirmation */
+
+/* Built on the native <dialog>. The backdrop is what makes the page behind
+   read as inactive, so it gets its own rule rather than an overlay div.
+   ::backdrop is the only part of a modal dialog the UA styles for you, and it
+   styles it to nearly nothing. */
+/* The UA stylesheet centres a modal dialog with `margin: auto`, but this sheet
+   zeroes body margins and gives the dialog an explicit width, and the two
+   together left it sitting off-centre over the buttons that opened it. Stating
+   the centring here makes it independent of the reset. `inset: 0` plus
+   `margin: auto` is the standard full-viewport centring trick, and works in
+   both axes. */
+.confirm {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  border: 0;
+  border-radius: var(--radius-lg);
+  padding: 0;
+  height: fit-content;
+  max-height: calc(100vh - 4rem);
+  max-width: min(30rem, calc(100vw - 2rem));
+  width: 100%;
+  box-shadow: 0 24px 48px -12px rgb(13 20 36 / 0.28);
+  color: var(--ink-800);
+  background: #fff;
+  overflow: auto;
+}
+
+.confirm::backdrop {
+  background: rgb(13 20 36 / 0.45);
+}
+
+/* Fade and lift rather than appear: a modal that pops in reads as an error. */
+.confirm[open] {
+  animation: confirm-in 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.confirm__title {
+  margin: 0;
+  padding: var(--sp-6) var(--sp-6) 0;
+  font-size: var(--step-0);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink-900);
+}
+
+.confirm__body {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-6) var(--sp-6);
+  color: var(--ink-600);
+  font-size: var(--step--1);
+}
+
+.confirm__actions {
+  display: flex;
+  gap: var(--sp-2);
+  justify-content: flex-end;
+  padding: var(--sp-4) var(--sp-6);
+  border-top: 1px solid var(--ink-100);
+  background: var(--ink-050);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* The confirming action is the one the keyboard lands on after Tab from Cancel,
+   so it must not sit flush against the right edge on a narrow screen. */
+@media (max-width: 30rem) {
+  .confirm__actions { flex-direction: column-reverse; }
+  .confirm__actions .btn { width: 100%; }
+}
+
+@keyframes confirm-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confirm[open] { animation: none; }
+}

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en"><body style="margin:0;padding:24px;background:#f4f6fa;
+  font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#0d1424">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e4e8f0;
+              border-radius:16px;padding:24px">
+    <p style="margin:0 0 4px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+              color:#9a4a06;font-weight:600">Trainer approval needed</p>
+    <h1 style="font-size:24px;margin:0 0 16px">New registration request</h1>
+    <p style="margin:0 0 16px">
+      Hello {{ trainer.full_name }},
+    </p>
+    <p style="margin:0 0 16px">
+      <strong>{{ request.full_name }}</strong> ({{ request.email }}) has asked to register
+      for Avanyam LMS and selected <strong>you</strong> as the trainer who reviews it.
+      Only you can approve or decline.
+    </p>
+    <p style="margin:0 0 20px">
+      <a href="{{ portal_url }}" style="display:inline-block;background:#c25e08;color:#fff;
+         text-decoration:none;font-weight:600;padding:11px 18px;border-radius:10px">
+        Review this request</a>
+    </p>
+    <p style="margin:0;color:#5a6a86;font-size:13px">
+      Requested {{ request.created_at|date:"j M Y, H:i" }}. You are receiving this because
+      the applicant chose you as their trainer.
+    </p>
+  </div>
+</body></html>

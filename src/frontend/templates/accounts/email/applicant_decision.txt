@@ -1,0 +1,32 @@
+Hello {{ request.full_name }},
+
+{% if approved %}
+Your Avanyam LMS registration was APPROVED by {{ decided_by.full_name }}.
+
+You can now sign in:
+
+{{ login_url }}
+
+{% elif redirected %}
+Your Avanyam LMS registration was not approved by {{ decided_by.full_name }} --
+but you are welcome to register again, most likely with a different trainer.
+
+Reason: {{ request.decision_note|default:"not supplied" }}
+
+Register again here:
+
+{{ signup_url }}
+
+Your previous password no longer works, because the account was closed when the
+application was declined. Choose a new one.
+
+{% else %}
+Your Avanyam LMS registration was NOT approved by {{ decided_by.full_name }}.
+
+Reason: {{ request.decision_note|default:"not supplied" }}
+
+This address cannot register again. If you believe this is a mistake, contact the
+trainer you selected -- they can reverse the decision.
+{% endif %}
+
+-- Avanyam LMS

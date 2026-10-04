@@ -1,0 +1,89 @@
+# avanyam_lms — Celery worker unit for the LMS app (NOT THE avanyam MEDIA PIPELINE).
+#
+# There are already `avanyam-celery-fast.service` and `avanyam-celery-beat.service`
+# in this directory. Those are for the *other* application (`avanyam`, deployed at
+# /opt/avanyam, queues "fast"/"bulk"). They will not run this project's tasks.
+#
+# This project's only tasks are the two approval notifications:
+#   accounts.notify_trainer_of_application
+#   accounts.notify_applicant_of_decision
+# Both are published from `transaction.on_commit`, never on a schedule, so there
+# is deliberately NO beat service here. `manage.py check` confirms no beat
+# schedule is configured; adding one would be dead weight.
+#
+# WHY THIS FILE IS NECESSARY
+#
+# Signup publishes the trainer notification with `.delay()`. That only writes a
+# message to Redis; nothing sends the mail unless a worker consumes it. Run the
+# app without a worker and every signup silently fails to notify: the applicant
+# is created, the queue shows the request, and no email is ever sent. That is
+# not a crash, so nothing alerts -- it just looks like the feature is flaky.
+#
+# Restart=always (not on-failure) is deliberate. A worker killed by an OOM or a
+# stray `kill` should come back on its own; there is no meaningful "clean exit"
+# for a consumer that is meant to run forever.
+#
+# The queue is "celery" because the app defines no custom task_queues; kombu's
+# default queue name is "celery". If CELERY_TASK_ROUTES is ever added, this -Q
+# must be widened to match, or the worker will idle while messages pile up.
+#
+# ## INSTALLING
+#
+# No root is needed for a per-user unit, and this host has no passwordless sudo,
+# so install it under the user's manager. Note `loginctl enable-linger` is
+# normally required for a user unit to start at boot without a login session;
+# it usually needs root, so check `loginctl show-user $USER -p Linger` reports
+# Linger=yes after installing.
+#
+#   mkdir -p ~/.config/systemd/user
+#   cp avanyam_terra/systemd/avanyam-lms-celery.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now avanyam-lms-celery
+#
+# Verify, rather than assuming:
+#   systemctl --user status avanyam-lms-celery
+#   journalctl --user -u avanyam-lms-celery -f     # expect "celery@<host> ready."
+#
+# To promote it to a system unit later, add User=/Group= and change the paths.
+
+[Unit]
+Description=avanyam LMS Celery worker (approval notifications)
+Documentation=file:///home/rupesh/avanyam_lms/avanyam_aqua/architecture.md
+After=network-online.target
+Wants=network-online.target
+# Deliberately NO `Requires=redis-server.service`. That reads well and is wrong:
+# a *user* unit lives in a different systemd manager and cannot depend on a
+# system unit at all -- the install fails outright with "Unit redis-server.service
+# not found". Depending on Redis is also the wrong shape. `Requires` would mean
+# "if Redis is down, do not start", which turns a transient startup race into a
+# dead worker. Redis is a boot-enabled system service, so by the time this runs
+# it is normally already up; and if it somehow is not, the worker exits and
+# Restart=always below brings it back within seconds. Retrying beats refusing.
+# Never give up either: the default 5-starts-in-10s limit would leave the unit in
+# a permanently "failed" state that hides the real reason behind `status`.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/home/rupesh/avanyam_lms
+
+Environment=DJANGO_SETTINGS_MODULE=config.settings.dev
+Environment=PYTHONPATH=/home/rupesh/avanyam_lms/src
+Environment=PYTHONUNBUFFERED=1
+
+ExecStart=/home/rupesh/avanyam_lms/avanyam_terra/.avanyam_terra_venv/bin/celery \
+    -A config worker \
+    -Q celery \
+    --concurrency=1 \
+    --loglevel=info
+
+Restart=always
+RestartSec=5
+# Celery handles SIGTERM with a warm shutdown: it stops accepting new messages
+# and lets in-flight ones finish. Cutting that short is how you get a task
+# re-delivered after it already sent its email.
+TimeoutStopSec=90
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=default.target

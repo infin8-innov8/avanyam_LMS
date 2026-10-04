@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en"><body style="margin:0;padding:24px;background:#f4f6fa;
+  font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#0d1424">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e4e8f0;
+              border-radius:16px;padding:24px">
+    <p style="margin:0 0 4px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+              font-weight:600;color:#b3261e">Reversing a rejection</p>
+    <h1 style="font-size:24px;margin:0 0 16px">Your confirmation code</h1>
+    <p style="margin:0 0 16px">Hello {{ trainer.full_name }},</p>
+    <p style="margin:0 0 12px">
+      You asked to reverse a rejection in Avanyam LMS.
+    </p>
+
+    <table role="presentation" cellpadding="0" cellspacing="0"
+           style="margin:0 0 20px;font-size:14px;color:#5a6a86">
+      <tr><td style="padding:2px 12px 2px 0">Applicant</td>
+          <td style="padding:2px 0;font-weight:600;color:#0d1424">{{ request.full_name }}</td></tr>
+      <tr><td style="padding:2px 12px 2px 0">Email</td>
+          <td style="padding:2px 0;font-weight:600;color:#0d1424">{{ request.email }}</td></tr>
+    </table>
+
+    <div style="margin:0 0 8px;font-size:13px;color:#5a6a86">Enter this within {{ minutes }} minutes</div>
+    <div style="margin:0 0 20px;padding:16px;background:#f4f6fa;border:1px solid #e4e8f0;
+                border-radius:10px;text-align:center">
+      <span style="font-size:32px;letter-spacing:.3em;font-weight:700;
+                   font-family:ui-monospace,SFMono-Regular,Menlo,monospace">{{ code }}</span>
+    </div>
+
+    <p style="margin:0 0 16px">
+      <a href="{{ queue_url }}" style="display:inline-block;background:#b3261e;color:#fff;
+         text-decoration:none;font-weight:600;padding:11px 18px;border-radius:10px">
+        Enter the code</a>
+    </p>
+
+    <p style="margin:0 0 12px;color:#5a6a86;font-size:13px">
+      It works once. If it expires or you enter it wrongly too many times, ask for another.
+    </p>
+
+    <div style="margin:20px 0 0;padding:14px 16px;background:#fdf3f2;
+                border:1px solid #f3d3d0;border-left:4px solid #b3261e;border-radius:10px">
+      <p style="margin:0 0 8px;font-weight:600">If you did not ask for this</p>
+      <p style="margin:0;color:#5a3540">
+        Ignore this message and change your Avanyam password. Someone with access to
+        your account may have requested this code.
+      </p>
+    </div>
+  </div>
+</body></html>

@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Approvals &middot; Avanyam LMS{% endblock %}
+
+{% comment %}
+  The approval screen. This is the whole point of the page: a trainer opens it to
+  make a decision, so the default view is the pending queue and nothing else.
+
+  Two deliberate choices:
+
+  * Status tabs instead of one long list. "Pending" is what needs action;
+    approved and declined are history you occasionally want to check, not
+    scroll past. The counts come from the view over the same rows that are
+    rendered, so a tab can never claim "3 pending" above a list of five.
+  * The note field sits inside the decision form rather than in a modal. A
+    dialog would have to trap keyboard users to be dismissable, and the thing
+    being confirmed -- declining someone's registration, permanently blocking
+    that email -- deserves to be visible in the page, not behind a click.
+{% endcomment %}
+
+{% block content %}
+<div class="card card--flush">
+
+  <div class="card__header">
+    <p class="eyebrow">Approvals</p>
+    <h1>Registration requests</h1>
+    <p class="lede" style="margin-bottom:0">
+      {% if counts.pending %}
+        {{ counts.pending }} trainee{{ counts.pending|pluralize }} waiting on your decision.
+        Approving unlocks the account and emails the trainee; declining keeps the
+        address blocked from registering again.
+      {% else %}
+        Nothing is waiting on you. New registrations arrive here and by email.
+      {% endif %}
+    </p>
+  </div>
+
+  {% if tabs %}
+    <nav class="tabs" aria-label="Filter requests by status">
+      {% for tab in tabs %}
+        <a class="tabs__tab{% if tab.is_current %} is-current{% endif %}"
+           href="?filter={{ tab.status }}"
+           {% if tab.is_current %}aria-current="page"{% endif %}>
+          {{ tab.label }}
+          <span class="tabs__count">{{ tab.count }}</span>
+        </a>
+      {% endfor %}
+    </nav>
+  {% endif %}
+
+  {% if requests %}
+    <ul class="queue">
+      {% for req in requests %}
+        <li class="queue__item">
+          <div class="queue__body">
+            <div class="queue__who">
+              {{ req.full_name }}
+              <span class="badge badge--{{ req.status }}">{{ req.status }}</span>
+            </div>
+            <div class="queue__meta">
+              {{ req.email }}
+            </div>
+            <div class="queue__meta">
+              Requested {{ req.created_at|date:"j M Y, H:i" }}
+              {% if req.decided_at %}
+                &middot; decided {{ req.decided_at|date:"j M Y, H:i" }}
+              {% endif %}
+              {% if req.waiting_days %}
+                &middot; waiting {{ req.waiting_days }} day{{ req.waiting_days|pluralize }}
+              {% endif %}
+            </div>
+            {% if req.decision_note %}
+              <div class="queue__meta"><strong>Note:</strong> {{ req.decision_note }}</div>
+            {% endif %}
+          </div>
+
+          {% if req.status == "pending" %}
+            <form method="post"
+                  action="{% url 'accounts:decide' request_pk=req.pk %}"
+                  class="queue__actions">
+              {% csrf_token %}
+              <label class="small muted" for="note-{{ req.pk }}">Note to the trainee (optional)</label>
+              <input type="text" id="note-{{ req.pk }}" name="note"
+                     placeholder="e.g. reporting to the wrong trainer">
+              <div class="queue__buttons">
+                {% comment %}
+                  The prompt lives on the button, not the form. It used to sit on
+                  the form, which meant clicking Approve asked the trainer to
+                  confirm a *decline* -- reported as "both buttons decline".
+                  Each button now names its own action, in its own words.
+                {% endcomment %}
+                <button class="btn btn--approve" type="submit" name="decision" value="approve"
+                        data-confirm="Approve {{ req.full_name|escapejs }}?"
+                        data-confirm-body="{{ req.full_name }} will get access to training content and be emailed at {{ req.email|escapejs }}."
+                        data-confirm-label="Approve"
+                        data-confirm-tone="approve">
+                  Approve
+                </button>
+                <button class="btn btn--reject" type="submit" name="decision" value="reject"
+                        data-confirm="Decline {{ req.full_name|escapejs }} permanently?"
+                        data-confirm-body="{{ req.full_name }} will be emailed, and this address will be blocked from registering again. You can undo this later with a code sent to your email."
+                        data-confirm-label="Decline permanently"
+                        data-confirm-tone="reject">
+                  Decline
+                </button>
+                <button class="btn btn--reject-soft" type="submit" name="decision" value="redirect"
+                        data-confirm="Decline {{ req.full_name|escapejs }} but allow them to re-register?"
+                        data-confirm-body="{{ req.full_name }} will be emailed and invited to apply again, most likely with a different trainer. This does not block the address."
+                        data-confirm-label="Allow re-register"
+                        data-confirm-tone="reject">
+                  Allow re-register
+                </button>
+              </div>
+            </form>
+          {% elif req.status == "rejected" and req.undo_allowed %}
+            {% comment %}
+              Undo is a two-step POST: request a code by email, then redeem it.
+              Both forms are separate because a single form would put a code field
+              on the page before the code exists, inviting people to guess.
+            {% endcomment %}
+            <div class="queue__actions">
+              <form method="post"
+                    action="{% url 'accounts:undo-code' request_pk=req.pk %}"
+                    data-confirm
+                    data-confirm="Send a code to reverse this decline?"
+                    data-confirm-body="A six-digit code will be emailed to you. It works once and expires in ten minutes."
+                    data-confirm-label="Email me a code"
+                    data-confirm-tone="approve">
+                {% csrf_token %}
+                <button class="btn btn--undo" type="submit">
+                  Undo decline&hellip;
+                </button>
+              </form>
+              <form method="post"
+                    action="{% url 'accounts:undo-confirm' request_pk=req.pk %}"
+                    class="queue__undo-form">
+                {% csrf_token %}
+                <label class="small muted" for="code-{{ req.pk }}">
+                  Or enter the code we emailed you
+                </label>
+                <div class="queue__undo-row">
+                  <input type="text" id="code-{{ req.pk }}" name="code"
+                         inputmode="numeric" autocomplete="one-time-code"
+                         pattern="[0-9]{6}" maxlength="6"
+                         placeholder="000000" required>
+                  <button class="btn btn--undo" type="submit">Reverse decline</button>
+                </div>
+              </form>
+            </div>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="queue__empty">
+      {% if selected == "pending" %}
+        <p class="queue__empty-title">Nothing waiting on you.</p>
+        <p class="muted">New registrations appear here and by email.</p>
+      {% elif selected == "approved" %}
+        <p class="queue__empty-title">You have not approved anyone yet.</p>
+        <p class="muted">Approved trainees move to this tab.</p>
+      {% else %}
+        <p class="queue__empty-title">Nothing declined.</p>
+        <p class="muted">Declined applications are kept here for the record.</p>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

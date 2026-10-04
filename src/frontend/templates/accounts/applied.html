@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Application received &middot; Avanyam LMS{% endblock %}
+{% block shell_class %}shell--narrow{% endblock %}
+
+{% block content %}
+<div class="card">
+  <p class="eyebrow">Application received</p>
+  <h1>Your request is with your trainer</h1>
+
+  <div class="note note--ok" role="status">
+    Your account has been created as <strong>pending</strong>. Nothing is unlocked yet.
+  </div>
+
+  <p class="lede">
+    We have emailed the trainer you selected. You will get a second email as soon as
+    they approve or decline &mdash; there is nothing else for you to do right now.
+  </p>
+
+  <p>
+    <a class="btn btn--primary" href="{% url 'accounts:login' %}">Go to sign in</a>
+  </p>
+</div>
+{% endblock %}

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Register &middot; Avanyam LMS{% endblock %}
+{% block shell_class %}shell--narrow{% endblock %}
+
+{% block content %}
+<div class="split">
+
+  <div class="card anim-rise" style="--i: 0">
+    <p class="eyebrow">Registration</p>
+    <h1>Request access</h1>
+    <p class="lede">
+      Tell us who you are and choose the trainer responsible for you. They will
+      review your request and approve your access.
+    </p>
+
+    {% if form.non_field_errors %}
+      <div class="note note--bad" role="alert">
+        {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+      </div>
+    {% endif %}
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      <div class="field{% if form.full_name.errors %} field--error{% endif %}">
+        <label for="{{ form.full_name.id_for_label }}">Full name</label>
+        {{ form.full_name }}
+        {% if form.full_name.errors %}
+          <ul class="errorlist">{% for e in form.full_name.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% endif %}
+      </div>
+
+      <div class="field{% if form.email.errors %} field--error{% endif %}">
+        <label for="{{ form.email.id_for_label }}">Email</label>
+        {{ form.email }}
+        {% if form.email.errors %}
+          <ul class="errorlist">{% for e in form.email.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% endif %}
+      </div>
+
+      <div class="field{% if form.trainer.errors %} field--error{% endif %}">
+        <label for="{{ form.trainer.id_for_label }}">{{ form.trainer.label }}</label>
+        {{ form.trainer }}
+        <span class="hint">{{ form.trainer.help_text }}</span>
+        {% if form.trainer.errors %}
+          <ul class="errorlist">{% for e in form.trainer.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% endif %}
+      </div>
+
+      <div class="field-row">
+        <div class="field{% if form.password1.errors %} field--error{% endif %}">
+          <label for="{{ form.password1.id_for_label }}">Password</label>
+          {{ form.password1 }}
+          {% if form.password1.errors %}
+            <ul class="errorlist">{% for e in form.password1.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+          {% endif %}
+        </div>
+        <div class="field{% if form.password2.errors %} field--error{% endif %}">
+          <label for="{{ form.password2.id_for_label }}">Confirm password</label>
+          {{ form.password2 }}
+          {% if form.password2.errors %}
+            <ul class="errorlist">{% for e in form.password2.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+          {% endif %}
+        </div>
+      </div>
+
+      <button class="btn btn--primary btn--block" type="submit">Submit request</button>
+    </form>
+
+    <p class="small muted" style="margin-top: var(--sp-4);">
+      Already registered? <a href="{% url 'accounts:login' %}">Sign in instead</a>.
+    </p>
+  </div>
+
+  <aside class="panel anim-rise" style="--i: 1">
+    <h2>What happens next</h2>
+    <ol>
+      <li><strong>You submit this form.</strong> Your account is created as
+        <em>pending</em> &mdash; nothing is unlocked yet.</li>
+      <li><strong>Your trainer is emailed.</strong> Only the trainer you selected is
+        notified, because they are the one accountable for you.</li>
+      <li><strong>They approve or decline.</strong> You receive an email either way,
+        including a reason if declined.</li>
+      <li><strong>You sign in.</strong> Courses and content unlock only after approval.</li>
+    </ol>
+    <div class="rule"></div>
+    <p class="small">
+      Trainers are organised like departments &mdash; each group has one dedicated
+      trainer who handles its database. Pick the trainer who owns your group so your
+      request reaches the right person first time.
+    </p>
+  </aside>
+
+</div>
+{% endblock %}
