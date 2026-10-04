@@ -12,13 +12,18 @@ from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, PasswordChangeView
 from django.db import transaction
-from django.http import Http404
-from django.shortcuts import redirect, render
+from django.http import Http404, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from apps.accounts.forms import LoginForm, SignupForm
-from apps.accounts.models import APPROVAL_UNDO_LIFETIME_MINUTES, SignupRequest
+from apps.accounts.models import (
+    APPROVAL_UNDO_LIFETIME_MINUTES,
+    ApprovalUndoToken,
+    SignupRequest,
+)
 from apps.accounts.policies import (
     can_undo,
     can_view_queue,
@@ -195,6 +200,18 @@ def trainer_queue(request):
             can_view_request(request.user, row).allowed and can_undo(row).allowed
         )
 
+    # Rows where this viewer already has a live code waiting. The dialog uses this
+    # to open straight on the code box rather than mailing a second code, which
+    # would expire the one they are reading.
+    undoable = [row.pk for row in shown if row.undo_allowed]
+    with_code = (
+        set(_live_codes(request.user, undoable).values_list("request_id", flat=True))
+        if undoable
+        else set()
+    )
+    for row in shown:
+        row.code_sent = row.pk in with_code
+
     return render(
         request,
         "accounts/trainer_queue.html",
@@ -205,6 +222,18 @@ def trainer_queue(request):
             "total": len(rows),
             "selected": selected,
         },
+    )
+
+
+#: A live code is one this viewer requested, that has not been used, and that has
+#: not expired. Built as a filter rather than a predicate so the queue can ask
+#: about every row in one query instead of one per row.
+def _live_codes(trainer, request_ids):
+    return ApprovalUndoToken.objects.filter(
+        request_id__in=request_ids,
+        requested_by=trainer,
+        consumed_at__isnull=True,
+        expires_at__gt=timezone.now(),
     )
 
 
@@ -245,26 +274,83 @@ _DECISION_PAST_TENSE = {
 }
 
 
+#: A refusal is reported to the browser as JSON when the dialog asked for it, and
+#: as a flash message plus a redirect when a plain form post arrived. Both shapes
+#: come from the same service error, so the dialog and the no-JS fallback can
+#: never disagree about *why* something failed.
+def _wants_json(request) -> bool:
+    return (
+        request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        or "application/json" in request.headers.get("Accept", "")
+    )
+
+
+def _undo_refused(request, reason: str):
+    if _wants_json(request):
+        return JsonResponse({"ok": False, "error": reason}, status=400)
+    messages.error(request, reason)
+    return redirect("accounts:trainer-queue")
+
+
+@login_required
+def undo_request_page(request, request_pk):
+    """The undo flow as a page of its own, for trainers without JS.
+
+    The queue row carries one button and nothing else. With JS the dialog does
+    both steps in place; without it, posting the button lands here, which is the
+    only other place the code box appears. Keeping it off the queue is the point:
+    a second control beside "Undo decline" turned one action into a choice between
+    two, and let a trainer submit an empty code before any existed.
+    """
+    req = get_object_or_404(
+        SignupRequest.objects.select_related("user", "selected_trainer"),
+        pk=request_pk,
+    )
+    visible = can_view_request(request.user, req).allowed
+    if not (visible and can_undo(req).allowed):
+        raise Http404("No such application.")
+
+    return render(
+        request,
+        "accounts/undo_request.html",
+        {
+            "req": req,
+            "code_sent": _live_codes(request.user, [req.pk]).exists(),
+            "minutes": APPROVAL_UNDO_LIFETIME_MINUTES,
+        },
+    )
+
+
 @login_required
 @require_POST
 def request_undo_code_view(request, request_pk):
-    """Mail the trainer a code so they can reverse a rejection."""
+    """Mail the trainer a code so they can undo a decline."""
     try:
         issued = request_undo_code(trainer=request.user, request_pk=request_pk)
     except SignupRequest.DoesNotExist as exc:
         raise Http404("No such application.") from exc
     except UndoError as exc:
-        messages.error(request, str(exc))
-        return redirect("accounts:trainer-queue")
+        return _undo_refused(request, str(exc))
 
-    # The code is deliberately not in the message. The page is a place a
-    # shoulder-surfer can read; the email is the point of the whole control.
+    minutes = APPROVAL_UNDO_LIFETIME_MINUTES
+    if _wants_json(request):
+        # `email` is the trainer's own address, returned so the dialog can say
+        # where the code went. It is the address the request was authenticated as,
+        # so this discloses nothing the page does not already know.
+        return JsonResponse(
+            {
+                "ok": True,
+                "email": issued.token.requested_by.email,
+                "minutes": minutes,
+            }
+        )
+
     messages.success(
         request,
         f"A confirmation code is on its way to {issued.token.requested_by.email}. "
-        f"It is valid for {APPROVAL_UNDO_LIFETIME_MINUTES} minutes.",
+        f"It is valid for {minutes} minutes.",
     )
-    return redirect("accounts:trainer-queue")
+    return redirect("accounts:undo-request", request_pk=request_pk)
 
 
 @login_required
@@ -280,13 +366,20 @@ def undo_rejection_view(request, request_pk):
     except SignupRequest.DoesNotExist as exc:
         raise Http404("No such application.") from exc
     except UndoError as exc:
-        messages.error(request, str(exc))
-        return redirect("accounts:trainer-queue")
+        # A refused code leaves the application rejected -- the service only moves
+        # the row inside `_redeem`, and nothing was redeemed. The dialog stays on
+        # its second step so the trainer can try again or ask for a new code.
+        return _undo_refused(request, str(exc))
+
+    if _wants_json(request):
+        return JsonResponse(
+            {"ok": True, "full_name": outcome.request.full_name, "status": "pending"}
+        )
 
     messages.success(
         request,
         f"{outcome.request.full_name} is back in the approval queue. "
-        "They have been told their rejection was reversed.",
+        "They have been told their decline was undone.",
     )
     return redirect("accounts:trainer-queue")
 

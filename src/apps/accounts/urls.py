@@ -16,6 +16,11 @@ urlpatterns = [
     path("trainer/queue/", views.trainer_queue, name="trainer-queue"),
     path("trainer/queue/<uuid:request_pk>/", views.decide_request, name="decide"),
     path(
+        "trainer/queue/<uuid:request_pk>/undo/",
+        views.undo_request_page,
+        name="undo-request",
+    ),
+    path(
         "trainer/queue/<uuid:request_pk>/undo/code/",
         views.request_undo_code_view,
         name="undo-code",

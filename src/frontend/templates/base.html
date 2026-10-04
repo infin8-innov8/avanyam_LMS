@@ -119,6 +119,37 @@
     </div>
   </dialog>
 
+  {% comment %}
+    Undoing a decline is one dialog with two steps, not one dialog per step.
+    Step one confirms; step two is this same dialog with the code box revealed.
+    Two dialogs would mean confirming twice and re-reading the same question,
+    and the state in between would have nowhere to show a failure.
+
+    One <dialog> holds both steps so Esc, focus trapping and the backdrop come
+    from the element instead of being reimplemented. portal.js fills it in; with
+    JS off it never opens and accounts/undo_request.html does the same two steps
+    as a page.
+  {% endcomment %}
+  <dialog class="confirm" id="undo-dialog"
+          aria-labelledby="undo-title" aria-describedby="undo-body">
+    <h2 class="confirm__title" id="undo-title">Undo this decline?</h2>
+    <p class="confirm__body" id="undo-body"></p>
+
+    <p class="confirm__error" id="undo-error" role="alert" hidden></p>
+
+    <div class="undo__code" id="undo-step-code" hidden>
+      <label class="undo__code-label" for="undo-code-input">Six-digit code</label>
+      <input class="undo__code-input" type="text" id="undo-code-input"
+             name="code" inputmode="numeric" autocomplete="one-time-code"
+             pattern="[0-9]{6}" maxlength="6" placeholder="000000">
+    </div>
+
+    <div class="confirm__actions">
+      <button class="btn btn--ghost" type="button" data-undo-cancel>Cancel</button>
+      <button class="btn btn--undo" type="button" data-undo-accept></button>
+    </div>
+  </dialog>
+
   <script src="{% static 'js/portal.js' %}" defer></script>
 
   <footer class="footer">

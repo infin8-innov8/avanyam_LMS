@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% comment %}
+  The undo flow for trainers without JavaScript.
+
+  It exists because the queue row carries a single button and nothing else. Two
+  controls on one row -- "Undo decline" beside a permanently visible code box --
+  read as a choice when they are really consecutive steps, and the box was
+  submittable before any code had been sent. With JavaScript the dialog in
+  base.html runs both steps without leaving the queue; this page is the same two
+  steps for everyone else.
+{% endcomment %}
+{% block title %}Undo decline &middot; Avanyam LMS{% endblock %}
+{% block shell_class %}shell--narrow{% endblock %}
+{% block content %}
+<div class="card">
+  <p class="eyebrow">Declined application</p>
+  <h1>Undo decline</h1>
+  <p class="lede">
+    {{ req.full_name }} &middot; {{ req.email }}
+  </p>
+  <p class="muted">
+    Undoing puts this application back in the approval queue. Nothing is decided
+    until you enter the code we email you.
+  </p>
+
+  {% if code_sent %}
+    {% comment %}
+      A code is already waiting. Asking for the code rather than sending another
+      one, because a second code expires the first and looks like a bad code.
+    {% endcomment %}
+    <form method="post" action="{% url 'accounts:undo-confirm' request_pk=req.pk %}" novalidate>
+      {% csrf_token %}
+      <div class="field">
+        <label for="code">Six-digit code</label>
+        <input type="text" id="code" name="code"
+               inputmode="numeric" autocomplete="one-time-code"
+               pattern="[0-9]{6}" maxlength="6" placeholder="000000" required>
+        <p class="hint">
+          Sent to {{ request.user.email }}. Valid for {{ minutes }} minutes.
+        </p>
+      </div>
+      <button class="btn btn--undo btn--block" type="submit">Undo decline</button>
+    </form>
+  {% else %}
+    <form method="post" action="{% url 'accounts:undo-code' request_pk=req.pk %}">
+      {% csrf_token %}
+      <button class="btn btn--undo btn--block" type="submit">Email me a code</button>
+    </form>
+  {% endif %}
+
+  <p class="muted">
+    <a href="{% url 'accounts:trainer-queue' %}?filter=rejected">Back to declined</a>
+  </p>
+</div>
+{% endblock %}

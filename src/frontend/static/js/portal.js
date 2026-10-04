@@ -15,9 +15,10 @@
  *   3. live password feedback, because the strength rules are otherwise only
  *      visible after a rejected submit.
  *
- * A fourth, the toast countdown, lives at the bottom of this file. The toasts
- * themselves are server-rendered in base.html, so the message and its markup
- * survive with this file blocked -- only the draining is added here.
+ * Two more live at the bottom: the OTP dialog for reversing a decline (3), and
+ * the toast countdown (5). The toasts themselves are server-rendered in
+ * base.html, so the message and its markup survive with this file blocked --
+ * only the draining is added here.
  */
 (function () {
   "use strict";
@@ -148,7 +149,250 @@
     });
   })();
 
-  // ---- 3. password feedback ----------------------------------------------
+  // ---- 3. undoing a decline ----------------------------------------------
+  //
+  // One dialog, two steps, in order: confirm, send the code, then enter it.
+  // Deliberately sequential. The page used to render two competing controls on
+  // every declined row -- a button to send a code, and a permanently visible box
+  // captioned "Or enter the code we emailed you" -- which asked the trainer to
+  // choose between two things that are consecutive steps, and let them submit an
+  // empty box to discover no code had been sent.
+  //
+  // The rule this implements: a refusal changes nothing. The server only moves the
+  // application out of `rejected` while redeeming a code, so every error path here
+  // just re-reports the message and stays on whichever step it was on. Cancelling
+  // mid-way is the same -- still declined, and a code sent but never used expires
+  // on its own.
+
+  (function undoDialog() {
+    var dialog = document.getElementById("undo-dialog");
+    if (!dialog) return;
+    // No fetch means no in-dialog posting. The queue button still posts, and
+    // lands on the undo page, which completes the same two steps.
+    if (typeof window.fetch !== "function") return;
+
+    var title = document.getElementById("undo-title");
+    var body = document.getElementById("undo-body");
+    var error = document.getElementById("undo-error");
+    var codeBox = document.getElementById("undo-step-code");
+    var input = document.getElementById("undo-code-input");
+    var accept = dialog.querySelector("[data-undo-accept]");
+    var cancel = dialog.querySelector("[data-undo-cancel]");
+
+    var pending = null; // the button that opened us
+    var step = "send";
+    var busy = false;
+
+    function csrfToken() {
+      var field = document.querySelector("[name=csrfmiddlewaretoken]");
+      return field ? field.value : "";
+    }
+
+    function showError(message) {
+      error.textContent = message;
+      error.hidden = false;
+    }
+
+    function clearError() {
+      error.textContent = "";
+      error.hidden = true;
+    }
+
+    function setStep(which) {
+      step = which;
+      codeBox.hidden = which !== "code";
+      accept.disabled = false;
+      if (which === "send") {
+        title.textContent = pending.getAttribute("data-name")
+          ? "Undo the decline for " + pending.getAttribute("data-name") + "?"
+          : "Undo this decline?";
+        body.textContent =
+          "We will email you a six-digit code. Enter it to confirm.";
+        accept.textContent = "Email me a code";
+      } else {
+        title.textContent = "Code sent";
+        body.textContent = "We emailed you a six-digit code for this application.";
+        accept.textContent = "Undo decline";
+      }
+      clearError();
+      input.value = "";
+    }
+
+    function open(button) {
+      pending = button;
+      show();
+
+      // A code already went out on an earlier visit, so skip straight to entry
+      // rather than mailing another and voiding the one they are reading. Sending
+      // a second code would expire the first, which looks like a broken code.
+      if (button.hasAttribute("data-undo-pending")) {
+        setStep("code");
+        input.focus();
+        return;
+      }
+      setStep("send");
+    }
+
+    function show() {
+      if (typeof dialog.showModal === "function") {
+        dialog.showModal();
+      } else {
+        // No <dialog>.showModal: still our markup and still styled, but focus
+        // trapping and Esc are ours to provide.
+        dialog.setAttribute("open", "");
+        document.addEventListener("keydown", onEscape);
+        cancel.focus();
+      }
+    }
+
+    function onEscape(event) {
+      if (event.key === "Escape" && pending) close();
+    }
+
+    function close() {
+      pending = null;
+      busy = false;
+      document.removeEventListener("keydown", onEscape);
+      if (typeof dialog.close === "function" && dialog.open) {
+        dialog.close();
+      } else {
+        dialog.removeAttribute("open");
+      }
+    }
+
+    function post(url, payload) {
+      return fetch(url, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+          "X-CSRFToken": csrfToken(),
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        },
+        body: payload,
+      }).then(function (response) {
+        return response
+          .json()
+          .catch(function () {
+            // A redirect to the login page or an error page arrives as HTML.
+            // Nothing was applied, so say so rather than showing a parse error.
+            return {
+              ok: false,
+              error:
+                "The server sent an unexpected reply. Nothing was changed.",
+            };
+          })
+          .then(function (data) {
+            return { status: response.status, data: data };
+          });
+      });
+    }
+
+    function restoreAccept() {
+      accept.disabled = false;
+      accept.textContent = step === "send" ? "Email me a code" : "Undo decline";
+    }
+
+    function submit() {
+      if (busy || !pending) return;
+
+      var code = input.value.trim();
+      if (step === "code" && !code) {
+        showError("Enter the six-digit code from the email.");
+        input.focus();
+        return;
+      }
+
+      var url =
+        step === "send" ? pending.getAttribute("data-code-url")
+                        : pending.getAttribute("data-confirm-url");
+
+      busy = true;
+      accept.disabled = true;
+      accept.textContent = step === "send" ? "Sending…" : "Checking…";
+      clearError();
+
+      post(url, step === "send" ? "" : "code=" + encodeURIComponent(code))
+        .then(function (result) {
+          busy = false;
+
+          if (!result.data.ok) {
+            // Stay on this step. The server refused, so the application is still
+            // declined and the trainer can retry, correct a typo, or cancel.
+            showError(
+              result.data.error || "That did not work. Nothing was changed."
+            );
+            restoreAccept();
+            if (step === "code") input.focus();
+            return;
+          }
+
+          if (step === "send") {
+            step = "code";
+            codeBox.hidden = false;
+            accept.disabled = false;
+            accept.textContent = "Undo decline";
+            title.textContent = "Code sent";
+            body.textContent =
+              "We emailed a six-digit code to " +
+              result.data.email +
+              ". It expires in " +
+              result.data.minutes +
+              " minutes.";
+            clearError();
+            input.value = "";
+            input.focus();
+            return;
+          }
+
+          // Redeemed. The row is back in the queue, so the page is now wrong --
+          // reload rather than patch one row's markup by hand.
+          close();
+          window.location.reload();
+        })
+        .catch(function () {
+          busy = false;
+          showError("Could not reach the server. Nothing was changed.");
+          restoreAccept();
+        });
+    }
+
+    document.querySelectorAll("[data-undo-start]").forEach(function (button) {
+      button.addEventListener("click", function (event) {
+        event.preventDefault();
+        open(button);
+      });
+    });
+
+    accept.addEventListener("click", submit);
+
+    // Enter in the code box should confirm, as it does in a form. Without this the
+    // trainer has to reach for the button, and the dialog would swallow the key
+    // because there is no form to submit.
+    input.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        submit();
+      }
+    });
+
+    // Clear a complaint as soon as they start fixing it.
+    input.addEventListener("input", function () {
+      if (!error.hidden) clearError();
+    });
+
+    cancel.addEventListener("click", close);
+    dialog.addEventListener("close", function () {
+      pending = null;
+      busy = false;
+      document.removeEventListener("keydown", onEscape);
+    });
+    dialog.addEventListener("cancel", function () {
+      pending = null;
+    });
+  })();
+
+  // ---- 4. password feedback ----------------------------------------------
 
   function scorePassword(value) {
     if (!value) return { score: 0, label: "" };
@@ -212,7 +456,7 @@
     }
   }
 
-    // ---- 4. toasts ---------------------------------------------------------
+    // ---- 5. toasts ---------------------------------------------------------
     //
     // Server-rendered, so this block only adds behaviour: drain, dismiss, pause.
     // Two deliberate rules:

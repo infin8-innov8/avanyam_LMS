@@ -621,17 +621,10 @@ select {
    `flex-wrap` does the responsive part, so there is no breakpoint to keep in
    sync with the queue grid above. */
 .queue__actions form { margin: 0; }
-.queue__undo-form { inline-size: 100%; }
-.queue__undo-row { display: flex; gap: var(--sp-2); align-items: center; }
-.queue__undo-row input[type="text"] {
-  inline-size: 8ch;
-  flex: 0 0 auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: var(--step-0);
-  letter-spacing: 0.15em;
-  text-align: center;
-}
-.queue__undo-form label { display: block; margin-block-end: var(--sp-1); }
+/* Undoing a decline is one button. The queue row has no code box, so there is
+   nothing to lay out here beyond the button's own margin; the box lives in the
+   dialog, and on the no-JS page. */
+.queue__undo-start { margin: 0; }
 
 .queue__empty { padding: var(--sp-6) var(--sp-5); text-align: center; }
 .queue__empty-title { margin: 0 0 var(--sp-1); font-weight: 600; }
@@ -704,6 +697,44 @@ select {
   border-top: 1px solid var(--ink-100);
   background: var(--ink-050);
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* A refused code leaves the application declined, so this reports "nothing
+   happened" rather than a loss. It carries role="alert" because the trainer has
+   usually moved to the next field by the time it appears. */
+.confirm__error {
+  margin: 0 var(--sp-6) var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--bad-600);
+  border-inline-start-width: 3px;
+  border-radius: 4px;
+  background: var(--bad-100);
+  color: var(--bad-600);
+  font-size: var(--step--1);
+}
+
+/* The code box. The field is sized in `ch` against the monospace stack so the six
+   digits plus their letter-spacing land on a fixed advance and the box does not
+   resize as they are typed. */
+.undo__code { padding: 0 var(--sp-6) var(--sp-5); }
+.undo__code-label {
+  display: block;
+  margin-block-end: var(--sp-2);
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--ink-700);
+}
+.undo__code-input {
+  inline-size: calc(6ch + 0.9em + var(--sp-4));
+  padding: var(--sp-3);
+  border: 1px solid var(--ink-300);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink-900);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--step-0);
+  letter-spacing: 0.15em;
+  text-align: center;
 }
 
 /* The confirming action is the one the keyboard lands on after Tab from Cancel,

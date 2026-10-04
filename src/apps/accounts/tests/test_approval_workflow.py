@@ -8,12 +8,17 @@ the wrong value.
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import pytest
 from django.core import mail
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.timezone import now
 
 from apps.accounts.domain.enums import ApprovalStatus
 from apps.accounts.models import (
+    APPROVAL_UNDO_LIFETIME_MINUTES,
     APPROVAL_UNDO_MAX_ATTEMPTS,
     ROLE_ADMIN,
     ApprovalUndoToken,
@@ -29,6 +34,12 @@ pytestmark = pytest.mark.django_db
 
 
 QUEUE = reverse("accounts:trainer-queue")
+
+#: Markers scoped to the undo page's own form. The dialog in base.html also owns
+#: an input called `name="code"`, on every page, so a bare name match would pass
+#: for the wrong reason.
+PAGE_CODE_FIELD = 'id="code"'
+
 
 
 def _apply(trainer, name="Kiran Rao", email="kiran@example.com", **form):
@@ -392,6 +403,110 @@ def test_the_undo_form_appears_only_on_a_rejected_row(client, trainer) -> None:
     assert reverse("accounts:undo-confirm", args=[rejected.pk]) in on_rejected
 
 
+def test_a_declined_row_offers_exactly_one_way_to_undo(client, trainer) -> None:
+    """The row must be a single button.
+
+    It used to render a button to send a code *and*, beside it, a permanently
+    visible box captioned "Or enter the code we emailed you". That asked the
+    trainer to choose between two things which are consecutive steps, and let
+    them submit an empty box before any code existed.
+    """
+    req = _rejected(trainer)
+    client.force_login(trainer)
+
+    html = client.get(QUEUE, {"filter": "rejected"}).content.decode()
+
+    assert html.count("data-undo-start") == 1
+    # One form, pointing at the send endpoint. The confirm URL is present only as
+    # the button's data-confirm-url, which is how the dialog knows where to post.
+    confirm_url = reverse("accounts:undo-confirm", args=[req.pk])
+    assert confirm_url in html
+    assert f'action="{confirm_url}"' not in html
+    # And no code box of any kind on the row.
+    assert "queue__undo-form" not in html
+    # Scoped to href/action: the standalone page URL is a prefix of .../undo/code/,
+    # which the form legitimately posts to.
+    page_url = reverse("accounts:undo-request", args=[req.pk])
+    assert f'href="{page_url}"' not in html
+    assert f'action="{page_url}"' not in html
+
+
+def test_the_code_box_lives_on_its_own_page_for_no_js(client, trainer) -> None:
+    """The queue row has one button; the no-JS path gets a page of its own rather
+    than a second control competing with it."""
+    req = _rejected(trainer)
+    client.force_login(trainer)
+
+    page = reverse("accounts:undo-request", args=[req.pk])
+
+    # Before a code exists the page asks for one...
+    first = client.get(page).content.decode()
+    assert "Email me a code" in first
+    assert PAGE_CODE_FIELD not in first
+
+    request_undo_code(trainer=trainer, request_pk=req.pk)
+
+    # ...and afterwards it asks for the code, not for another one.
+    second = client.get(page).content.decode()
+    assert PAGE_CODE_FIELD in second
+    assert "Email me a code" not in second
+
+
+def test_the_undo_page_is_closed_to_anybody_who_cannot_undo(client, trainer) -> None:
+    req = _rejected(trainer)
+    trainee = make_user("trainee@example.com", role="trainee", approved=True)
+    other = make_user("nosy@example.com", role="trainer", approved=True)
+    client.force_login(trainee)
+    assert client.get(reverse("accounts:undo-request", args=[req.pk])).status_code == 404
+
+    client.force_login(other)
+    assert client.get(reverse("accounts:undo-request", args=[req.pk])).status_code == 404
+
+
+def test_a_pending_application_has_no_undo_page(client, trainer) -> None:
+    pending = _apply(trainer, email="pending@example.com")
+    client.force_login(trainer)
+
+    response = client.get(reverse("accounts:undo-request", args=[pending.pk]))
+
+    assert response.status_code == 404
+
+
+def test_a_sent_code_tells_the_button_to_skip_ahead(client, trainer) -> None:
+    """With a code already out, the dialog opens on the code box.
+
+    Mailing a second one would expire the first, which the trainer would read as
+    a bad code rather than as their own earlier click.
+    """
+    req = _rejected(trainer)
+    client.force_login(trainer)
+
+    before = client.get(QUEUE, {"filter": "rejected"}).content.decode()
+    assert "data-undo-pending" not in before
+
+    request_undo_code(trainer=trainer, request_pk=req.pk)
+
+    after = client.get(QUEUE, {"filter": "rejected"}).content.decode()
+    assert "data-undo-pending" in after
+
+
+def test_an_expired_code_does_not_promise_a_way_in(client, trainer) -> None:
+    """A live code is what unlocks the box. An expired one must not, or the
+    trainer is offered a way to finish that cannot succeed."""
+    req = _rejected(trainer)
+    request_undo_code(trainer=trainer, request_pk=req.pk)
+    ApprovalUndoToken.objects.filter(request=req).update(
+        expires_at=timezone.now() - timedelta(seconds=1)
+    )
+    client.force_login(trainer)
+
+    queue_html = client.get(QUEUE, {"filter": "rejected"}).content.decode()
+    page_html = client.get(reverse("accounts:undo-request", args=[req.pk])).content.decode()
+
+    assert "data-undo-pending" not in queue_html
+    assert "Email me a code" in page_html
+
+
 def test_another_trainer_never_sees_the_row_to_undo(client, trainer, other_trainer) -> None:
     req = _rejected(trainer)
     client.force_login(other_trainer)
@@ -478,6 +593,133 @@ def test_a_trainee_is_refused_the_undo_endpoints(client, trainer) -> None:
 
     assert req.status == ApprovalStatus.REJECTED
     assert "queue" in response.content.decode().lower()
+
+
+# ---------------------------------------------------------------------------
+# The dialog's JSON contract
+#
+# The undo dialog posts with X-Requested-With and reads JSON, while the no-JS
+# fallback posts the same endpoints as a plain form. Both shapes come from one
+# service error, so these tests pin the agreement.
+# ---------------------------------------------------------------------------
+
+
+def test_requesting_a_code_answers_the_dialog_with_where_it_went(client, trainer) -> None:
+    req = _rejected(trainer)
+    client.force_login(trainer)
+
+    response = client.post(
+        reverse("accounts:undo-code", args=[req.pk]),
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    # The dialog says where the code went, so it needs the address and the window.
+    assert body["email"] == trainer.email
+    assert body["minutes"] == APPROVAL_UNDO_LIFETIME_MINUTES
+    # Never the code itself -- it goes in the email, not the response body.
+    assert "code" not in body
+
+
+def test_redeeming_answers_the_dialog_with_the_new_state(client, trainer) -> None:
+    req = _rejected(trainer)
+    issued = request_undo_code(trainer=trainer, request_pk=req.pk)
+    client.force_login(trainer)
+
+    response = client.post(
+        reverse("accounts:undo-confirm", args=[req.pk]),
+        {"code": issued.code},
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {"ok": True, "full_name": req.full_name, "status": "pending"}
+
+
+def test_a_wrong_code_answers_the_dialog_and_changes_nothing(client, trainer) -> None:
+    """The dialog's whole error path: report it, stay put.
+
+    The trainer must still be looking at a declined application, because that is
+    what the service left behind.
+    """
+    req = _rejected(trainer)
+    request_undo_code(trainer=trainer, request_pk=req.pk)
+    client.force_login(trainer)
+
+    response = client.post(
+        reverse("accounts:undo-confirm", args=[req.pk]),
+        {"code": "000000"},
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+
+    assert response.status_code == 400
+    body = response.json()
+    assert body["ok"] is False
+    assert body["error"]
+    req.refresh_from_db()
+    assert req.status == ApprovalStatus.REJECTED
+
+
+def test_a_failed_send_leaves_the_row_declined(client, trainer) -> None:
+    """Sending a code is not a decision, so a refusal must not move the row."""
+    req = _rejected(trainer)
+    trainer.is_superuser = True
+    trainer.save()
+    # Now the request has no linked user to restore, so the send is refused.
+    req.user = None
+    req.save()
+    client.force_login(trainer)
+
+    response = client.post(
+        reverse("accounts:undo-code", args=[req.pk]),
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+
+    assert response.status_code == 400
+    assert response.json()["ok"] is False
+    req.refresh_from_db()
+    assert req.status == ApprovalStatus.REJECTED
+
+
+def test_the_endpoints_still_serve_plain_form_posts(client, trainer) -> None:
+    """The no-JS path must keep working: no AJAX header, redirect not JSON."""
+    req = _rejected(trainer)
+    issued = request_undo_code(trainer=trainer, request_pk=req.pk)
+    client.force_login(trainer)
+
+    # The send lands on the undo page, where the code can still be entered.
+    plain = client.post(reverse("accounts:undo-code", args=[req.pk]))
+    assert plain.status_code == 302
+    assert plain["Location"] == reverse("accounts:undo-request", args=[req.pk])
+
+    ok = client.post(reverse("accounts:undo-confirm", args=[req.pk]), {"code": issued.code})
+    assert ok.status_code == 302
+    assert ok["Location"] == reverse("accounts:trainer-queue")
+
+
+def test_a_refusal_answers_the_dialog_with_a_reason_not_a_redirect(client, trainer) -> None:
+    """A redirect would reach the dialog as unparseable HTML and read as
+    "unexpected reply" instead of the real reason. The status is the service's
+    to choose; the shape is not."""
+    req = _rejected(trainer)
+    trainee = make_user("trainee@example.com", role="trainee", approved=True)
+    client.force_login(trainee)
+
+    response = client.post(
+        reverse("accounts:undo-code", args=[req.pk]),
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+
+    assert response.status_code == 400
+    assert response["Content-Type"].startswith("application/json")
+    body = response.json()
+    assert body["ok"] is False
+    assert body["error"]
+    req.refresh_from_db()
+    assert req.status == ApprovalStatus.REJECTED
 
 
 def test_roles_are_untouched_by_an_undo(trainer) -> None:

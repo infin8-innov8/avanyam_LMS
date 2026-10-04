@@ -113,40 +113,30 @@
             </form>
           {% elif req.status == "rejected" and req.undo_allowed %}
             {% comment %}
-              Undo is a two-step POST: request a code by email, then redeem it.
-              Both forms are separate because a single form would put a code field
-              on the page before the code exists, inviting people to guess.
+              One button, and nothing else. This used to render a button to send
+              a code *and*, beside it, a code box captioned "Or enter the code we
+              emailed you" -- two controls for one action, with the second one
+              live before any code existed. Without JS the button posts and lands
+              on accounts/undo_request.html, which is the only other place the box
+              appears. With JS the dialog does both steps here.
             {% endcomment %}
             <div class="queue__actions">
               <form method="post"
                     action="{% url 'accounts:undo-code' request_pk=req.pk %}"
-                    data-confirm
-                    data-confirm="Send a code to reverse this decline?"
-                    data-confirm-body="A six-digit code will be emailed to you. It works once and expires in ten minutes."
-                    data-confirm-label="Email me a code"
-                    data-confirm-tone="approve">
+                    class="queue__undo-start">
                 {% csrf_token %}
-                <button class="btn btn--undo" type="submit">
-                  Undo decline&hellip;
+                <button class="btn btn--undo"
+                        type="submit"
+                        data-undo-start
+                        data-code-url="{% url 'accounts:undo-code' request_pk=req.pk %}"
+                        data-confirm-url="{% url 'accounts:undo-confirm' request_pk=req.pk %}"
+                        data-name="{{ req.full_name }}"
+                        {% if req.code_sent %}data-undo-pending{% endif %}>
+                  {% if req.code_sent %}Enter the emailed code&hellip;{% else %}Undo decline{% endif %}
                 </button>
-              </form>
-              <form method="post"
-                    action="{% url 'accounts:undo-confirm' request_pk=req.pk %}"
-                    class="queue__undo-form">
-                {% csrf_token %}
-                <label class="small muted" for="code-{{ req.pk }}">
-                  Or enter the code we emailed you
-                </label>
-                <div class="queue__undo-row">
-                  <input type="text" id="code-{{ req.pk }}" name="code"
-                         inputmode="numeric" autocomplete="one-time-code"
-                         pattern="[0-9]{6}" maxlength="6"
-                         placeholder="000000" required>
-                  <button class="btn btn--undo" type="submit">Reverse decline</button>
-                </div>
-              </form>
-            </div>
-          {% endif %}
+</form>
+              </div>
+            {% endif %}
         </li>
       {% endfor %}
     </ul>
