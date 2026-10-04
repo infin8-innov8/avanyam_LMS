@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Avanyam &middot; Learning &amp; Capability Building{% endblock %}
+{% block meta_description %}Avanyam is the internal platform for courses, assessments, competency mapping and certification, with every account reviewed by a trainer before access is granted.{% endblock %}
+{% block stylesheets %}<link rel="stylesheet" href="{% static 'css/home.css' %}">{% endblock %}
+{% block shell_class %}page{% endblock %}
+{% block wordmark_url %}{% url 'pages:home' %}{% endblock %}
+
+{% comment %}
+    The public front door. Written to the same tokens as the portal
+    (tokens.css § brand ramp) rather than a second design system, because an
+    employee who signs in from here must not feel they have landed on a
+    different product.
+
+    Two constraints shape the markup more than the layout does:
+
+    * Every fact here comes from prd.md. Where the platform has not built
+      something yet, the page says nothing about it. A marketing page that
+      oversells is worse than no page when the first login lands on a form.
+    * Nothing below depends on JavaScript. The role switcher is a radio group
+      and the reveals are a class that home.js adds, so with scripting off the
+      page is the same page, fully readable, just not animated.
+{% endcomment %}
+
+{% block content %}
+
+<nav class="hp-nav" aria-label="On this page">
+  <div class="hp-nav__inner hp-wrap">
+    <a href="#problem">Why it exists</a>
+    <a href="#roles">Who it serves</a>
+    <a href="#capabilities">What it does</a>
+    <a href="#access">Getting in</a>
+  </div>
+</nav>
+
+<header class="hp-hero">
+  <div class="hp-hero__grid hp-wrap">
+    <div class="hp-hero__copy">
+      <p class="eyebrow anim-rise" style="--i: 0">Internal Learning &amp; Capability Building</p>
+      <h1 class="anim-rise" style="--i: 1">Training records you can defend in an audit</h1>
+      <p class="lede anim-rise" style="--i: 2">One place for courses, assessments, competency and certificates, replacing the spreadsheets and email threads that training runs on today.</p>
+      <div class="hp-cta anim-rise" style="--i: 3">
+        <a class="btn btn--primary btn--cta" href="{% url 'accounts:signup' %}">Register</a>
+        <a class="btn btn--ghost" href="{% url 'accounts:login' %}">Sign in</a>
+      </div>
+    </div>
+
+    {% comment %}
+      A photograph of the real sign-in page rather than a mock-up. A drawn
+      approximation of this product would be a claim nobody has checked, and
+      the one screen every visitor actually needs is the one they are about to
+      see anyway.
+    {% endcomment %}
+    <figure class="hp-shot anim-rise" style="--i: 4">
+      <img src="{% static 'img/sign-in.jpg' %}"
+           width="1280" height="763"
+           alt="The Avanyam sign-in page: email and password fields with a Sign in button, beside a panel explaining that staff accounts are sent to the corporate identity provider."
+           decoding="async" fetchpriority="high">
+      <figcaption>Every account is reviewed by a trainer before access is granted.</figcaption>
+    </figure>
+  </div>
+</header>
+
+<section class="hp-section" id="problem" aria-labelledby="problem-h">
+  <div class="hp-wrap">
+    <div class="hp-head hp-reveal">
+      <h2 id="problem-h">Training runs on spreadsheets and email</h2>
+      <p class="lede">Four costs that surface the first time anyone asks what was completed, by whom, and who was qualified to teach it.</p>
+    </div>
+
+    <ol class="hp-costs">
+      <li class="hp-cost hp-reveal" style="--i: 0">
+        <h3>No reliable record</h3>
+        <p>Completion records get assembled on demand, which is not dependable enough to stand up as evidence in an audit or an accreditation.</p>
+      </li>
+      <li class="hp-cost hp-reveal" style="--i: 1">
+        <h3>Trainer assignment is a judgement call</h3>
+        <p>Who may teach which subject is settled informally, so nobody can say whether a qualified trainer is even available.</p>
+      </li>
+      <li class="hp-cost hp-reveal" style="--i: 2">
+        <h3>The same details, entered again</h3>
+        <p>Qualifications, experience and skills are retyped into every system that asks for them, and the copies stop agreeing with each other.</p>
+      </li>
+      <li class="hp-cost hp-reveal" style="--i: 3">
+        <h3>Capability you cannot see</h3>
+        <p>No consolidated view of what skills people hold, where the gaps are, or which training has quietly gone overdue.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section class="hp-section hp-band" id="roles" aria-labelledby="roles-h">
+  <div class="hp-wrap">
+    <div class="hp-head hp-reveal">
+      <h2 id="roles-h">One platform, four points of view</h2>
+      <p class="lede">A person holds every role that applies to them, and the active role is a session choice rather than a second account. Choose one to see what it opens.</p>
+    </div>
+
+    {% comment %}
+      The switcher is four radio inputs and a set of `:checked ~` rules in
+      home.css. A tab widget in JavaScript would need ARIA roles, arrow-key
+      handling and a no-JS fallback to the same content; the radio group gives
+      all of that from the platform, and arrow keys move between roles for free.
+      The inputs stay in the accessibility tree (1px, transparent) so they
+      remain focusable, which `display: none` would destroy.
+    {% endcomment %}
+    <fieldset class="hp-roles hp-reveal">
+      <legend class="hp-legend">Choose a role</legend>
+
+      <input class="hp-radio" type="radio" name="hp-role" id="hp-role-trainee" checked>
+      <input class="hp-radio" type="radio" name="hp-role" id="hp-role-trainer">
+      <input class="hp-radio" type="radio" name="hp-role" id="hp-role-admin">
+      <input class="hp-radio" type="radio" name="hp-role" id="hp-role-platform">
+
+      <div class="hp-tabs">
+        <label for="hp-role-trainee">Trainee</label>
+        <label for="hp-role-trainer">Trainer</label>
+        <label for="hp-role-admin">Administrator</label>
+        <label for="hp-role-platform">IT and platform</label>
+      </div>
+
+      <div class="hp-panels">
+        <div class="hp-panel hp-panel--trainee">
+          <h3>Learn, and hold the evidence</h3>
+          <p>One profile for qualifications, experience, interests, skills and credentials, with progress you can point at in a review.</p>
+          <ul class="hp-list">
+            <li>Qualifications, experience and skills recorded once</li>
+            <li>Progress recorded automatically as content completes</li>
+            <li>Assessments that mark on the server, never in the browser</li>
+            <li>Certificates you can verify by reference number</li>
+          </ul>
+        </div>
+
+        <div class="hp-panel hp-panel--trainer">
+          <h3>Teach, and see how it landed</h3>
+          <p>Publish and manage your own content, then see how a cohort did without ever opening an individual's answers.</p>
+          <ul class="hp-list">
+            <li>Resumable uploads that survive a dropped connection</li>
+            <li>Files malware scanned and video converted before release</li>
+            <li>Questionnaires with an opening date, a closing date and a pass mark</li>
+            <li>Cohort results for your own courses only</li>
+          </ul>
+        </div>
+
+        <div class="hp-panel hp-panel--admin">
+          <h3>Decide, and keep the organisation legible</h3>
+          <p>The queue that decides who gets in, and the map that says who should be teaching what.</p>
+          <ul class="hp-list">
+            <li>Approve or decline signups with a recorded reason</li>
+            <li>Grant and revoke roles across the organisation</li>
+            <li>Trainer recommendations per subject, with the reasoning shown</li>
+            <li>Participation, completion and certification reporting</li>
+          </ul>
+        </div>
+
+        <div class="hp-panel hp-panel--platform">
+          <h3>Onboard and revoke in one place</h3>
+          <p>One identity provider to join and leave through, and no custom authentication code left behind to audit.</p>
+          <ul class="hp-list">
+            <li>Single sign-on through the corporate directory</li>
+            <li>Group mapped roles, so access follows the directory</li>
+            <li>Directory staff created on first sign-in</li>
+            <li>Trusted devices an administrator can withdraw immediately</li>
+          </ul>
+        </div>
+      </div>
+    </fieldset>
+  </div>
+</section>
+
+<section class="hp-section" id="capabilities" aria-labelledby="capabilities-h">
+  <div class="hp-wrap">
+    <div class="hp-head hp-reveal">
+      <h2 id="capabilities-h">What the platform actually does</h2>
+      <p class="lede">The parts that change how the work gets done, rather than the parts that would be nice to have on a roadmap.</p>
+    </div>
+
+    <div class="hp-bento">
+      <article class="hp-cell hp-cell--glow hp-reveal" style="--i: 0">
+        <h3>Assessment</h3>
+        <p>Multiple choice questionnaires with an opening date, a closing date, a time limit and a pass mark.</p>
+        <p>Answers autosave as they are given, and the order differs per trainee, so two people sitting the same questionnaire are not looking at the same page.</p>
+        <p>Correct answers never reach the browser. Scoring happens on the server, and the question set freezes at the moment an attempt starts, so a later edit to the bank cannot rewrite a completed result.</p>
+      </article>
+
+      <article class="hp-cell hp-reveal" style="--i: 1">
+        <h3>Competency mapping</h3>
+        <p>Administrators define the level a subject needs to be taught at.</p>
+        <p>The platform returns a ranked list of suitable trainers with its reasoning shown, and warns where a subject has no verified trainer at all.</p>
+      </article>
+
+      <article class="hp-cell hp-cell--texture hp-reveal" style="--i: 2">
+        <h3>Certification</h3>
+        <p>Issuance schemes, a PDF certificate and a unique verification code.</p>
+        <p>Certificates expire per scheme wherever the scheme says they should.</p>
+      </article>
+
+      <article class="hp-cell hp-reveal" style="--i: 3">
+        <h3>Course delivery</h3>
+        <p>Courses are subjects and modules, and trainers upload to them directly.</p>
+        <p>Files are malware scanned and video converted for reliable streaming before anything is released to a trainee.</p>
+      </article>
+
+      <article class="hp-cell hp-cell--rule hp-reveal" style="--i: 4">
+        <h3>Reporting that respects the role</h3>
+        <p>Administrators see participation, completion, pass rates and competency gaps across the organisation.</p>
+        <p>Trainers see aggregated results for their own courses. Trainees see their own progress. Nobody reads a colleague's answers.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="hp-section hp-band" id="access" aria-labelledby="access-h">
+  <div class="hp-wrap">
+    <div class="hp-head hp-reveal">
+      <h2 id="access-h">Getting in</h2>
+      <p class="lede">Access is reviewed rather than granted on request, which is the entire reason the approval queue exists.</p>
+    </div>
+
+    <ol class="hp-steps">
+      <li class="hp-step hp-reveal" style="--i: 0">
+        <span class="hp-step__mark" aria-hidden="true">1</span>
+        <div>
+          <h3>Register</h3>
+          <p>Name, email, department, and the role you are asking for. Administrator is not on this form, by design rather than by hiding it.</p>
+        </div>
+      </li>
+      <li class="hp-step hp-reveal" style="--i: 1">
+        <span class="hp-step__mark" aria-hidden="true">2</span>
+        <div>
+          <h3>Trainer review</h3>
+          <p>A trainer works the queue and approves or declines, recording a reason you can read afterwards either way.</p>
+        </div>
+      </li>
+      <li class="hp-step hp-reveal" style="--i: 2">
+        <span class="hp-step__mark" aria-hidden="true">3</span>
+        <div>
+          <h3>Activation</h3>
+          <p>Approval activates the account and assigns the roles it was granted. Directory staff can also be created on their first single sign-on.</p>
+        </div>
+      </li>
+      <li class="hp-step hp-reveal" style="--i: 3">
+        <span class="hp-step__mark" aria-hidden="true">4</span>
+        <div>
+          <h3>Sign in</h3>
+          <p>Approved accounts sign in with the email and password their trainer approved. Staff accounts are sent to the corporate identity provider instead.</p>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section class="hp-close" aria-labelledby="close-h">
+  <div class="hp-wrap hp-close__inner hp-reveal">
+    <h2 id="close-h">Ready when your trainer is</h2>
+    <p class="lede">Register and your application goes in front of a trainer. Nothing here is granted automatically.</p>
+    <div class="hp-cta hp-cta--center">
+      <a class="btn btn--primary btn--cta" href="{% url 'accounts:signup' %}">Register</a>
+      <a class="btn btn--ghost" href="{% url 'accounts:login' %}">Sign in</a>
+    </div>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block scripts %}<script src="{% static 'js/home.js' %}" defer></script>{% endblock %}
