@@ -15,7 +15,6 @@ from __future__ import annotations
 import pytest
 from django.db import connections
 
-from apps.accounts.models import User
 from apps.accounts.tests.conftest import GOOD_PASSWORD, make_user
 
 # Tables the web process must be able to work with.
@@ -46,9 +45,8 @@ def app_cursor(django_db_blocker):
       exist on this host. Nothing here reads or writes application rows, so
       there is nothing to roll back.
     """
-    with django_db_blocker.unblock():
-        with connections["runtime"].cursor() as cursor:
-            yield cursor
+    with django_db_blocker.unblock(), connections["runtime"].cursor() as cursor:
+        yield cursor
 
 
 @pytest.mark.parametrize("table", BUSINESS_TABLES)

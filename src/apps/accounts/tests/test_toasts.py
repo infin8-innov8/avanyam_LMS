@@ -10,7 +10,6 @@ otherwise tie together: base.html renders it, avanyam.css animates it against
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import pytest
 from django.conf import settings
@@ -23,7 +22,7 @@ pytestmark = pytest.mark.django_db
 
 LOGIN_URL = "/accounts/login/"
 SIGNUP_URL = "/accounts/signup/"
-QUEUE_URL = "/accounts/trainer/queue/"
+QUEUE_URL = "/accounts/admin/queue/"
 
 TIMER = 'class="toast__timer"'
 
@@ -43,7 +42,7 @@ def _js() -> str:
 
 
 def _toast_blocks(html: str) -> list[str]:
-    return re.findall(r'<div class="toast .*?</div>', html, flags=re.S)
+    return re.findall(r'<div class="toast .*?</div>', html, flags=re.DOTALL)
 
 
 def _toast_count(html: str) -> int:
@@ -155,7 +154,7 @@ def test_a_clean_page_has_no_toast_region(client) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_an_approval_outcome_toasts_to_the_trainer(client, trainer) -> None:
+def test_an_approval_outcome_toasts_to_the_admin(client, admin) -> None:
     # The request must be linked to a real account: decide() refuses to approve
     # an orphan ("not linked to an account"), which would turn this into a test
     # of the error path.
@@ -163,10 +162,9 @@ def test_an_approval_outcome_toasts_to_the_trainer(client, trainer) -> None:
     req = SignupRequest.objects.create(
         email=applicant.email,
         full_name="Toasted Applicant",
-        selected_trainer=trainer,
         user=applicant,
     )
-    client.force_login(trainer)
+    client.force_login(admin)
 
     html = client.post(
         f"{QUEUE_URL}{req.pk}/", {"decision": "approve"}, follow=True
@@ -179,14 +177,13 @@ def test_an_approval_outcome_toasts_to_the_trainer(client, trainer) -> None:
     )
 
 
-def test_a_refused_decision_toasts_the_reason(client, trainer) -> None:
+def test_a_refused_decision_toasts_the_reason(client, admin) -> None:
     """The error path, end to end: the view's DecisionError becomes a toast."""
     orphan = SignupRequest.objects.create(
         email="orphan@example.test",
         full_name="Orphan Applicant",
-        selected_trainer=trainer,
     )
-    client.force_login(trainer)
+    client.force_login(admin)
 
     html = client.post(
         f"{QUEUE_URL}{orphan.pk}/", {"decision": "approve"}, follow=True
@@ -246,8 +243,8 @@ def test_the_stack_only_accepts_clicks_on_the_toasts_themselves() -> None:
     """A fixed overlay that swallows clicks is a bug, not a feature."""
     css = _css()
 
-    stack = re.search(r"\.toasts \{.*?\}", css, flags=re.S)
-    single = re.search(r"\.toast \{.*?\}", css, flags=re.S)
+    stack = re.search(r"\.toasts \{.*?\}", css, flags=re.DOTALL)
+    single = re.search(r"\.toast \{.*?\}", css, flags=re.DOTALL)
 
     assert stack and single, "toast rules are missing"
     assert "pointer-events: none" in stack.group(0), "the stack blocks the page"
@@ -258,7 +255,7 @@ def test_toasts_are_positioned_above_the_sticky_header() -> None:
     """Otherwise the masthead swallows them."""
     css = _css()
 
-    stack = re.search(r"\.toasts \{.*?\}", css, flags=re.S).group(0)
+    stack = re.search(r"\.toasts \{.*?\}", css, flags=re.DOTALL).group(0)
     header_z = int(re.search(r"z-index: (\d+);", css).group(1))
 
     toast_z = int(re.search(r"z-index: (\d+);", stack).group(1))
@@ -270,7 +267,7 @@ def test_reduced_motion_keeps_the_countdown_but_drops_the_slide() -> None:
     css = _css()
     toast_css = css[css.index("/* ------------------------------------------------------------------ toasts") :]
     reduced = re.search(
-        r"@media \(prefers-reduced-motion: reduce\) \{(.*?)\n  \}", toast_css, flags=re.S
+        r"@media \(prefers-reduced-motion: reduce\) \{(.*?)\n  \}", toast_css, flags=re.DOTALL
     )
     assert reduced, "no reduced-motion block for toasts"
 
@@ -299,7 +296,7 @@ def test_the_page_never_leaks_a_template_comment(client) -> None:
         # A raw opener or closer in the *output* means the lexer gave up. These
         # two may legitimately appear inside a comment block's own text, so they
         # are checked outside of one rather than banned outright.
-        body = re.sub(r"\{% comment %\}.*?\{% endcomment %\}", "", html, flags=re.S)
+        body = re.sub(r"\{% comment %\}.*?\{% endcomment %\}", "", html, flags=re.DOTALL)
         assert "{#" not in body, f"{url} is emitting a raw template comment opener"
         assert "#}" not in body, f"{url} is emitting a raw template comment closer"
         assert "{% comment %}" not in html, f"{url} is emitting a comment block tag"

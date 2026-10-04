@@ -22,6 +22,7 @@ import itertools
 
 import pytest
 
+from apps.accounts.domain.enums import RequestedRole
 from apps.accounts.models import (
     ROLE_ADMIN,
     ROLE_TRAINEE,
@@ -85,9 +86,9 @@ def test_deactivated_user_is_not_approved_even_if_approved(trainer) -> None:
 
 
 def test_can_register_requires_approval(trainee, trainer) -> None:
-    assert can_register(trainer) is True
-    assert can_register(trainee) is False
-    assert can_register(None) is False
+    assert can_register(trainer).allowed is True
+    assert can_register(trainee).allowed is False
+    assert can_register(None).allowed is False
 
 
 # ---------------------------------------------------------------------------
@@ -95,14 +96,28 @@ def test_can_register_requires_approval(trainee, trainer) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_chosen_trainer_may_approve(trainer) -> None:
-    assert can_approve(trainer, _application(trainer=trainer)).allowed is True
+def test_trainer_may_not_approve_anything(trainer) -> None:
+    """There is no trainer queue any more (D41), so this is the base case.
 
-
-def test_another_trainer_may_not_approve(trainer, other_trainer) -> None:
-    decision = can_approve(other_trainer, _application(trainer=trainer))
+    It replaced a test asserting that a trainer could approve the applicant who
+    named them. Nothing in the model replaces that authority -- keeping a test in
+    the old shape would imply there is a privileged trainer somewhere.
+    """
+    decision = can_approve(trainer, _application(trainer=trainer))
     assert decision.allowed is False
-    assert "selected" in decision.reason
+    assert "Only admins" in decision.reason
+
+
+def test_one_trainer_is_no_more_privileged_than_another(trainer, other_trainer) -> None:
+    """Both trainers are equally unable, which is what a shared queue means.
+
+    The old pair of tests distinguished them: the chosen trainer could decide,
+    the other could not. With no chosen trainer, they are the same row in the
+    same position.
+    """
+    req = _application(trainer=trainer)
+    assert can_approve(other_trainer, req).allowed is False
+    assert can_approve(trainer, req).allowed is False
 
 
 def test_pending_trainer_may_not_approve(trainer) -> None:
@@ -115,11 +130,11 @@ def test_ordinary_trainee_may_not_approve(trainer) -> None:
     nobody = make_user("nosy.trainee@example.test", role=ROLE_TRAINEE)
     decision = can_approve(nobody, _application(trainer=trainer))
     assert decision.allowed is False
-    assert "trainers and admins" in decision.reason
+    assert "Only admins" in decision.reason
 
 
 def test_admin_may_approve_anything(admin, trainer, other_trainer) -> None:
-    """Admins are the override. Pinning it so it cannot be tightened by accident."""
+    """Admins decide everything, whoever the application once named. Pinning it."""
     assert can_approve(admin, _application(trainer=trainer)).allowed is True
     assert can_approve(admin, _application(trainer=other_trainer)).allowed is True
 
@@ -130,28 +145,9 @@ def test_pending_admin_may_not_approve(admin) -> None:
     assert can_approve(unapproved, _application()).allowed is False
 
 
-def test_no_trainer_chosen_blocks_the_trainer_path(trainer) -> None:
-    decision = can_approve(trainer, _application(trainer=None))
-    assert decision.allowed is False
-    assert "chosen a trainer" in decision.reason
-
-
 def test_admin_can_approve_when_no_trainer_was_chosen(admin) -> None:
-    """Otherwise a request with no trainer would be un-approvable by anyone."""
+    """An unassigned application is ordinary under a shared queue."""
     assert can_approve(admin, _application(trainer=None)).allowed is True
-
-
-def test_trainer_cannot_approve_their_own_application(trainer) -> None:
-    """Separation of duties: the applicant picked themselves, and still cannot."""
-    self_picked = SignupRequest.objects.create(
-        email=trainer.email,
-        full_name=trainer.full_name,
-        user=trainer,
-        selected_trainer=trainer,
-    )
-    decision = can_approve(trainer, self_picked)
-    assert decision.allowed is False
-    assert "own application" in decision.reason
 
 
 def test_admin_cannot_approve_their_own_application(admin) -> None:
@@ -162,21 +158,21 @@ def test_admin_cannot_approve_their_own_application(admin) -> None:
     assert can_approve(admin, own).allowed is False
 
 
-def test_self_approval_message_names_the_real_reason(trainer) -> None:
-    """Ordering matters for the message, even though both branches deny.
+def test_self_approval_message_names_the_real_reason(admin) -> None:
+    """The self-approval rule must be reached before the general admin one.
 
-    If the trainer-match check ran first, someone who nominated themselves would
-    be told they are not the selected trainer -- the same fact, phrased so as to
-    hide the actual rule being enforced.
+    Both deny. If the admin check ran first, an admin who somehow reached the
+    queue for their own application would be told "only admins may decide",
+    which is both unhelpful and hides the rule that actually stopped them.
     """
-    self_picked = SignupRequest.objects.create(
-        email=trainer.email, full_name=trainer.full_name, user=trainer, selected_trainer=trainer
+    own = SignupRequest.objects.create(
+        email=admin.email, full_name=admin.full_name, user=admin, selected_trainer=None
     )
-    assert "own application" in can_approve(trainer, self_picked).reason
+    assert "own application" in can_approve(admin, own).reason
 
 
-def test_none_cannot_approve(trainer) -> None:
-    assert can_approve(None, _application(trainer=trainer)).allowed is False
+def test_none_cannot_approve(admin) -> None:
+    assert can_approve(None, _application(trainer=None)).allowed is False
 
 
 # ---------------------------------------------------------------------------
@@ -184,47 +180,33 @@ def test_none_cannot_approve(trainer) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_only_approved_trainers_and_admins_see_the_queue(
+def test_only_approved_admins_see_the_queue(
     trainer, admin, approved_trainee, trainee
 ) -> None:
-    assert can_view_queue(trainer) is True
+    """The queue is admin-only (D41). A trainer sees nothing, however senior."""
     assert can_view_queue(admin) is True
+    assert can_view_queue(trainer) is False, "trainers are not approvers any more"
     assert can_view_queue(approved_trainee) is False, "trainees are not approvers"
     assert can_view_queue(trainee) is False, "pending users are inert"
     assert can_view_queue(None) is False
 
 
-def test_trainer_queue_is_scoped_to_their_own_applicants(trainer, other_trainer) -> None:
-    mine = _application(trainer=trainer)
-    theirs = _application(trainer=other_trainer)
-
-    visible = visible_requests(trainer)
-
-    assert mine in visible
-    assert theirs not in visible
-
-
 def test_admin_queue_sees_everything(admin, trainer, other_trainer) -> None:
+    """One shared queue: every application, whoever it once named."""
     mine = _application(trainer=trainer)
     theirs = _application(trainer=other_trainer)
+    unassigned = _application(trainer=None)
 
     visible = visible_requests(admin)
 
-    assert mine in visible and theirs in visible
+    assert {mine, theirs, unassigned} <= set(visible)
 
 
-def test_trainer_cannot_see_unqueued_applications_in_their_queue(trainer) -> None:
-    """An application with no trainer belongs to nobody's queue."""
-    orphaned = _application(trainer=None)
-    assert orphaned not in visible_requests(trainer)
-
-
-def test_queue_does_not_leak_a_trainers_other_applicants(admin) -> None:
-    """A trainer's queue must not contain another trainer's applicants."""
-    other = _application(trainer=None)
-    visible = visible_requests(admin)
-    assert other in visible  # admin sees all
+def test_queue_does_not_leak_to_a_non_approver(admin, trainer) -> None:
+    """A trainer asking for the queue gets an empty set, not someone else's rows."""
+    assert visible_requests(trainer) == []
     assert visible_requests(make_user("lurker@example.test", role=ROLE_TRAINER)) == []
+    assert visible_requests(None) == []
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +214,7 @@ def test_queue_does_not_leak_a_trainers_other_applicants(admin) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_policy_allows_exactly_what_the_service_allows(trainer, other_trainer, admin) -> None:
+def test_policy_allows_exactly_what_the_service_allows(admin, trainer) -> None:
     """`approval.py` delegates to `can_approve`; assert it still does.
 
     If someone re-inlines the check into the service, this pair of expectations
@@ -245,14 +227,14 @@ def test_policy_allows_exactly_what_the_service_allows(trainer, other_trainer, a
     req = _application(applicant=applicant, trainer=trainer)
 
     # the policy said no, so the service must refuse and leave the row untouched
-    assert can_approve(other_trainer, req).allowed is False
+    assert can_approve(trainer, req).allowed is False
     with pytest.raises(DecisionError):
-        decide(approver=other_trainer, request_pk=req.pk, approve=True)
+        decide(approver=trainer, request_pk=req.pk, approve=True)
     assert SignupRequest.objects.get(pk=req.pk).status == "pending"
 
     # the policy said yes, so the service must proceed
-    assert can_approve(trainer, req).allowed is True
-    decide(approver=trainer, request_pk=req.pk, approve=True)
+    assert can_approve(admin, req).allowed is True
+    decide(approver=admin, request_pk=req.pk, approve=True)
     assert SignupRequest.objects.get(pk=req.pk).status == "approved"
 
     # and an admin can still handle a request that has no trainer at all
@@ -265,44 +247,48 @@ def test_policy_allows_exactly_what_the_service_allows(trainer, other_trainer, a
     assert SignupRequest.objects.get(pk=unassigned.pk).status == "rejected"
 
 
-def test_approving_an_unlinked_application_is_refused(trainer) -> None:
+def test_approving_an_unlinked_application_is_refused(admin) -> None:
     """An application with no account behind it cannot be approved."""
     from apps.accounts.service.approval import DecisionError, decide
 
-    orphan = _application(trainer=trainer)
-    assert can_approve(trainer, orphan).allowed is True  # policy allows it...
+    orphan = _application(trainer=None)
+    assert can_approve(admin, orphan).allowed is True  # policy allows it...
 
     with pytest.raises(DecisionError, match="not linked to an account"):
-        decide(approver=trainer, request_pk=orphan.pk, approve=True)  # ...service refuses
+        decide(approver=admin, request_pk=orphan.pk, approve=True)  # ...service refuses
 
     assert SignupRequest.objects.get(pk=orphan.pk).status == "pending"
 
 
-def test_approving_does_not_grant_the_trainer_role(trainer) -> None:
+def test_approving_grants_the_requested_role_and_nothing_else(admin) -> None:
     """The regression, asserted at the service boundary.
 
-    Approval used to grant ROLE_TRAINER, which turned any trainee into an
-    approver. Roles are assigned when the person is created, never here.
+    Approval used to grant ROLE_TRAINER unconditionally, which turned any
+    trainee into an approver. Now it grants exactly the role the application
+    asked for -- and a pending applicant has no role at all, so the *grant* is
+    the only thing that adds one (D49).
     """
     from apps.accounts.service.approval import decide
+    from apps.accounts.service.roles import current_roles
 
-    applicant = make_user("will.be.promoted@example.test", role=ROLE_TRAINEE, approved=False)
+    applicant = make_user("will.be.promoted@example.test", role=None, approved=False)
     req = SignupRequest.objects.create(
         email=applicant.email,
         full_name=applicant.full_name,
         user=applicant,
-        selected_trainer=trainer,
+        requested_role=RequestedRole.TRAINER,
     )
+    assert current_roles(applicant) == [], "pending applicants hold no role"
 
-    decide(approver=trainer, request_pk=req.pk, approve=True)
+    decide(approver=admin, request_pk=req.pk, approve=True)
 
     applicant.refresh_from_db()
     assert applicant.approval_status == "approved"
     assert sorted(applicant.role_assignments.values_list("role__slug", flat=True)) == [
-        ROLE_TRAINEE
+        ROLE_TRAINER
     ]
-    assert not applicant.has_role(ROLE_TRAINER)
-    # and the promoted user still cannot approve anyone: not a trainer, no role
+    # The trainer role it asked for does not make it an approver. Under D41 that
+    # authority belongs to admins alone, which is the whole point of the fix.
     assert can_approve(applicant, _application(trainer=applicant)).allowed is False
 
 
@@ -384,6 +370,12 @@ def test_superuser_override_does_not_grant_trainer_facilities(superuser: User, t
     """
     unapproved = make_user("root2@example.test", approved=False, is_superuser=True)
 
-    assert is_superuser(unapproved) is True
+    # Two separate things, and both have to hold. `is_superuser` is False here
+    # because an unapproved account is inactive (D45), which is the same reason a
+    # half-created operator confers nothing -- so this is not evidence about the
+    # override at all. The override itself is the `superuser` fixture, who is
+    # approved and active and therefore does pass.
+    assert is_superuser(unapproved) is False
+    assert is_superuser(superuser) is True
     assert is_approved(unapproved) is False
-    assert can_register(unapproved) is False
+    assert can_register(unapproved).allowed is False

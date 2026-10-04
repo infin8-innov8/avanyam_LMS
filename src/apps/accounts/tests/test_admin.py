@@ -39,7 +39,6 @@ def staff_client(db) -> Client:
         is_staff=True,
         is_superuser=True,
         approval_status="approved",
-        must_change_password=False,
     )
     client = Client()
     client.force_login(staff)

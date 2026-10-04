@@ -5,7 +5,13 @@ from __future__ import annotations
 import pytest
 from django.contrib.auth import get_user_model
 
-from apps.accounts.models import ROLE_ADMIN, ROLE_TRAINEE, ROLE_TRAINER, Role, RoleAssignment
+from apps.accounts.models import (
+    ROLE_ADMIN,
+    ROLE_TRAINEE,
+    ROLE_TRAINER,
+    Role,
+    RoleAssignment,
+)
 
 User = get_user_model()
 
@@ -15,17 +21,33 @@ GOOD_PASSWORD = "Corr3ct-Horse-Battery-9"
 
 
 def make_user(email: str, *, role: str | None = None, approved: bool = True, **extra):
-    """Create a user with an optional role, bypassing password validation."""
+    """Create a user with an optional role, bypassing password validation.
+
+    Note there is no `must_change_password` argument: the column is gone (D43).
+    A test that needs to assert something about forced password changes is
+    asserting about a flag that no longer exists, and should say so instead.
+
+    `role` grants a RoleAssignment directly rather than going through
+    `service.roles`, because these fixtures are *arranging* state, not
+    exercising the code that produces it. The one test that cares about the
+    production path (`test_roles_service.py`) uses the service.
+
+    `approved=False` produces a pending account *and* `is_active=False`, which
+    is what signup does. Both are needed: a pending account that is still active
+    would pass `ModelBackend.authenticate` and the tests asserting refusal at
+    login would pass for the wrong reason.
+    """
     from apps.accounts.domain.enums import ApprovalStatus
 
+    approval_status = (
+        ApprovalStatus.APPROVED if approved else ApprovalStatus.PENDING
+    )
     user = User.objects.create_user(
         email=email,
         password=GOOD_PASSWORD,
         full_name=email.split("@")[0].replace(".", " ").title(),
-        approval_status=(
-            ApprovalStatus.APPROVED if approved else ApprovalStatus.PENDING
-        ),
-        must_change_password=False,
+        approval_status=approval_status,
+        is_active=approved,
         **extra,
     )
     if role:

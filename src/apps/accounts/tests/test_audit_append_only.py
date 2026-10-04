@@ -34,9 +34,8 @@ def audit_cursor(django_db_blocker):
     audit.settings_dict["PASSWORD"] = app["PASSWORD"]
     try:
         audit.close()
-        with django_db_blocker.unblock():
-            with audit.cursor() as cursor:
-                yield cursor
+        with django_db_blocker.unblock(), audit.cursor() as cursor:
+            yield cursor
     finally:
         audit.settings_dict["USER"], audit.settings_dict["PASSWORD"] = original
         audit.close()
