@@ -53,7 +53,14 @@ avanyam_terra/conf/tls/
 # ── Not source: derived or regenerable after configuration ──────────────────
 # Project documentation. Regenerated from the code and the decisions recorded in
 # it; the repo carries the code that these describe, not the prose.
+#
+# README.md is the exception: it is the entry point for anyone arriving at the
+# repository, so the one document a person reads *before* they have the code has
+# to be in the repository. `!README.md` alone is not enough -- git does not
+# re-include a file when a parent directory is excluded, so the negation is
+# written directly after the `*.md` rule that would otherwise discard it.
 *.md
+!README.md
 
 # Briefs and the VM architecture PDF are authored documents, not inputs to a build.
 avanyam_*.txt
