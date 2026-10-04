@@ -28,6 +28,11 @@ app = Celery("avanyam")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()
 
+# Imported for the side effect: it connects the task lifecycle signals at import
+# time. Without this line the signals exist in the module but nothing loads it, and
+# `celery.log` stays empty -- which is precisely the failure this line prevents.
+import config.celery_observability  # noqa: E402,F401
+
 
 @app.task(bind=True, ignore_result=True)
 def debug_task(self):  # pragma: no cover - operational aid

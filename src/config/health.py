@@ -16,14 +16,15 @@ LDAP and Keycloak are deliberately absent from `readyz`. `architecture.md`
 requires they report `DEGRADED`, never `DOWN` -- a directory outage must not pull
 every web worker out of rotation.
 """
-import logging
 
 from django.conf import settings
 from django.db import connections
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
-logger = logging.getLogger(__name__)
+from apps.common.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @require_GET
@@ -47,7 +48,13 @@ def readyz(request):
             cursor.fetchone()
         checks["database"] = "UP"
     except Exception as exc:  # noqa: BLE001 - report, do not raise
-        logger.warning("readyz: database check failed: %s", exc)
+        logger.warning(
+            "health.dependency_check_failed",
+            "A readiness check failed, so this instance left the load balancer",
+            outcome="failure",
+            check='database',
+            error_type=type(exc).__name__,
+        )
         checks["database"] = f"DOWN: {type(exc).__name__}"
         ok = False
 
@@ -63,7 +70,13 @@ def readyz(request):
             checks["cache"] = "DOWN: read-after-write failed"
             ok = False
     except Exception as exc:  # noqa: BLE001
-        logger.warning("readyz: cache check failed: %s", exc)
+        logger.warning(
+            "health.dependency_check_failed",
+            "A readiness check failed, so this instance left the load balancer",
+            outcome="failure",
+            check='cache',
+            error_type=type(exc).__name__,
+        )
         checks["cache"] = f"DOWN: {type(exc).__name__}"
         ok = False
 
@@ -83,7 +96,13 @@ def readyz(request):
         client.head_bucket(Bucket=settings.AWS_STORAGE_BUCKET_NAME)
         checks["object_store"] = "UP"
     except Exception as exc:  # noqa: BLE001
-        logger.warning("readyz: object store check failed: %s", exc)
+        logger.warning(
+            "health.dependency_check_failed",
+            "A readiness check failed, so this instance left the load balancer",
+            outcome="failure",
+            check='object_store',
+            error_type=type(exc).__name__,
+        )
         checks["object_store"] = f"DOWN: {type(exc).__name__}"
         ok = False
 
