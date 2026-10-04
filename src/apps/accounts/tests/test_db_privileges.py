@@ -16,6 +16,7 @@ import pytest
 from django.db import connections
 
 from apps.accounts.models import User
+from apps.accounts.tests.conftest import GOOD_PASSWORD, make_user
 
 # Tables the web process must be able to work with.
 BUSINESS_TABLES = [
@@ -138,12 +139,19 @@ def test_runtime_role_cannot_connect_to_keycloak_database(app_cursor):
     assert reachable == 0, "avanyam_app must not be able to CONNECT to any keycloak database"
 
 
-def test_passwords_are_not_stored_in_plaintext(django_db_blocker):
-    """A regression guard on the seed command's output."""
-    with django_db_blocker.unblock():
-        seeded = User.objects.filter(email__endswith="@gmail.com").first()
-    if seeded is None:
-        pytest.skip("no seeded accounts present")
-    assert seeded is not None
-    assert seeded.password.startswith(("pbkdf2_", "argon2", "bcrypt", "md5$"))
-    assert "activ8" not in seeded.password
+def test_passwords_are_not_stored_in_plaintext(db):
+    """A regression guard on the password-storage path.
+
+    Self-contained on purpose. This used to look for an ambient seeded account
+    and `pytest.skip` when it found none, which meant it could be voided by
+    anything that changed the seed roster's email domain -- it went green while
+    asserting nothing. It creates its own account now, so the guard always runs.
+    """
+    user = make_user("trainee1@example.com", approved=False)
+
+    user.refresh_from_db()
+    assert user.password.startswith(("pbkdf2_", "argon2", "bcrypt", "md5$")), (
+        f"password appears to be stored in a recoverable form: {user.password[:20]!r}"
+    )
+    assert GOOD_PASSWORD not in user.password
+    assert "activ8" not in user.password
