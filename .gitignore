@@ -59,6 +59,12 @@ avanyam_terra/conf/tls/
 avanyam_*.txt
 *.pdf
 
+# Questionnaire responses. These are other people's answers to
+# /home/rupesh/Documents/questions-by-avanyam.txt, and they carry their real names
+# and email addresses -- a push publishes those to everyone with repo access.
+# The consolidated `final_report.txt` inherits every one of them. Local only.
+reports/
+
 # Editor / OS noise
 .vscode/
 .idea/
