@@ -1,45 +1,49 @@
 from __future__ import annotations
 
 from django import forms
-from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm
+from django.contrib.auth.forms import AuthenticationForm
 
+from apps.accounts.domain.enums import RequestedRole
 from apps.accounts.models import User
 from apps.accounts.service.signup import SignupError, submit_application
-from apps.accounts.policies import is_approved
 
 
-class TrainerChoiceField(forms.ModelChoiceField):
-    """Only trainers who can actually approve are offered.
+class RoleChoiceField(forms.ChoiceField):
+    """The roles an applicant may ask for -- `trainee` or `trainer`.
 
-    Filtering in the queryset rather than validating later means a trainee
-    cannot be told "that trainer is unavailable" after they have already filled
-    in the rest of the form.
+    The choices are generated from `RequestedRole`, an enum that has **no**
+    `ADMIN` member. That is the point: `prd.md` §4 requires admin to be
+    structurally unreachable from signup, and a hand-written `choices=` list is
+    one edit away from offering it. Generating from the enum means a future role
+    is unreachable until somebody adds it there on purpose, and `SignupForm`'s
+    validator refuses it a second time at the service boundary.
+
+    Also used by the Admin's approval queue, where the same enum is the set of
+    roles an override may choose.
     """
 
     def __init__(self, **kwargs):
-        from apps.accounts.models import ROLE_ADMIN, ROLE_TRAINER
-
-        eligible = (
-            User.objects.active()
-            .filter(role_assignments__role__slug__in=[ROLE_TRAINER, ROLE_ADMIN])
-            .distinct()
-            .order_by("full_name")
-        )
-        kwargs.setdefault("queryset", eligible)
         kwargs.setdefault(
-            "label",
-            "Choose your trainer",
+            "choices",
+            [(role.value, role.value.capitalize()) for role in RequestedRole],
         )
+        kwargs.setdefault("label", "I am applying as")
         kwargs.setdefault(
             "help_text",
-            "Your trainer reviews and approves your registration. "
-            "Trainers are grouped like departments, so pick the one responsible for you.",
+            "An admin reviews every registration and can change this before "
+            "approving it.",
         )
         super().__init__(**kwargs)
 
 
 class SignupForm(forms.Form):
-    """Registration. Submission creates a *pending* account, never an active one."""
+    """Registration. Submission creates a *pending* account, never an active one.
+
+    Serves both entry points: a person registering themselves, and a Trainer or
+    Admin creating an account for someone else. The fields are identical because
+    the outcomes are identical -- a pending account plus an application -- and the
+    only difference is who fills the form in, which the service records.
+    """
 
     full_name = forms.CharField(
         max_length=255,
@@ -48,7 +52,7 @@ class SignupForm(forms.Form):
     email = forms.EmailField(
         widget=forms.EmailInput(attrs={"autocomplete": "email", "inputmode": "email"})
     )
-    trainer = TrainerChoiceField()
+    requested_role = RoleChoiceField()
     password1 = forms.CharField(
         label="Password",
         strip=False,
@@ -96,7 +100,7 @@ class SignupForm(forms.Form):
                 email=self.cleaned_data["email"],
                 full_name=self.cleaned_data["full_name"],
                 password=self.cleaned_data["password1"],
-                selected_trainer=self.cleaned_data["trainer"],
+                requested_role=self.cleaned_data["requested_role"],
                 requester=requester,
             )
         except SignupError as exc:
@@ -112,7 +116,3 @@ class LoginForm(AuthenticationForm):
             attrs={"autocomplete": "email", "inputmode": "email", "autofocus": True}
         ),
     )
-
-
-class FirstPasswordChangeForm(PasswordChangeForm):
-    """Seeded accounts arrive with a predictable password and must replace it."""

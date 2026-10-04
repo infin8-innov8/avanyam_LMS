@@ -2,11 +2,17 @@
 
 Signup is the one flow that must not be half-applied: a User without its
 SignupRequest breaks the §6.2 "rejected email cannot re-register" guarantee,
-and a SignupRequest whose notification failed leaves a trainee waiting forever
+and a SignupRequest whose notification failed leaves an applicant waiting forever
 with nobody told. So the DB writes are one transaction and the notification is
 dispatched only after commit.
 
 The password is never stored on SignupRequest -- only the hash on User.
+
+**No role is granted here.** `rules.md` §6 forbids granting a role without an
+approval decision, so a pending account carries no `RoleAssignment` at all. The
+role arrives in `service.approval.decide`, and an Admin may substitute a different
+one from the requested value. An earlier version assigned `trainee` at signup,
+which meant a rejected applicant's account held a role the whole time.
 """
 
 from __future__ import annotations
@@ -16,9 +22,14 @@ from dataclasses import dataclass
 from django.conf import settings
 from django.db import IntegrityError, transaction
 
-from apps.accounts.domain.enums import ApprovalStatus, AuthSource
-from apps.accounts.models import ROLE_TRAINEE, Role, RoleAssignment, SignupRequest, User
-from apps.accounts.policies import is_approved
+from apps.accounts.domain.enums import (
+    REQUESTABLE_ROLES,
+    ApprovalStatus,
+    AuthSource,
+    RequestedRole,
+)
+from apps.accounts.models import SignupRequest, User
+from apps.accounts.policies import can_register
 
 
 class SignupError(Exception):
@@ -36,11 +47,23 @@ def signup_enabled() -> bool:
     return bool(getattr(settings, "ACCOUNTS", {}).get("SIGNUP_ENABLED", False))
 
 
-def _validate_trainer(trainer: User) -> None:
-    if not is_approved(trainer):
-        raise SignupError("That trainer is not available to approve applications.")
-    if not trainer.has_role("trainer") and not trainer.has_role("admin"):
-        raise SignupError("That trainer is not available to approve applications.")
+def _validate_requested_role(raw: str) -> RequestedRole:
+    """Refuse anything outside `RequestedRole`, and say so as a form error.
+
+    The form already generates its choices from the same enum, so reaching this
+    with a bad value means a direct POST or a stale client. `admin` lands here
+    too, and is refused by construction rather than by the absence of a choice --
+    `prd.md` §4 asks for a validator, not a hidden field.
+    """
+    try:
+        role = RequestedRole(raw)
+    except ValueError as exc:
+        raise SignupError("That is not a role you can apply for.") from exc
+    if role not in REQUESTABLE_ROLES:
+        # Unreachable while `REQUESTABLE_ROLES` is built from the enum. Written
+        # anyway so that widening the enum later cannot quietly widen signup.
+        raise SignupError("That is not a role you can apply for.")
+    return role
 
 
 def _normalise_full_name(raw: str) -> str:
@@ -49,7 +72,7 @@ def _normalise_full_name(raw: str) -> str:
     `SignupForm.clean_full_name` does this too, but the service is the boundary
     that owns the invariant, and `submit_application` is called from more than the
     form. Leaving it to the form means any other caller stores `"Jane  A  Smith"`
-    and the duplicate-looking names show up as distinct rows in the trainer list.
+    and the duplicate-looking names show up as distinct rows in the admin list.
     """
     return " ".join(raw.split())
 
@@ -59,27 +82,26 @@ def submit_application(
     email: str,
     full_name: str,
     password: str,
-    selected_trainer: User,
+    requested_role: str,
     requester: User | None = None,
 ) -> SignupResult:
-    """Register a trainee as *pending* and tell their chosen trainer.
+    """Register an applicant as *pending* and put the application in the Admin queue.
 
-    The trainee is created `pending`, never `approved`: signup exists and is
-    inert until a trainer decides (§15).
+    Serves both callers: a person registering themselves (`requester=None`) and a
+    Trainer or Admin creating an account for them (`requester` set). The resulting
+    state is identical, and `created_by` is what distinguishes them later.
 
-    `must_change_password` is deliberately left at its default. It exists for
-    accounts created with a *predictable* password -- the seeded staff accounts,
-    whose password is derived from the person's name. A signup user chose their
-    own password, so demanding they immediately replace it teaches them to ignore
-    the prompt.
+    The applicant is created `pending`, never `approved`, and with no role.
     """
     if not signup_enabled():
         raise SignupError("Registration is currently closed.")
 
-    _validate_trainer(selected_trainer)
+    role = _validate_requested_role(requested_role)
 
-    if requester is not None and not is_approved(requester):
-        raise SignupError("Only approved staff may submit applications on behalf of others.")
+    if requester is not None:
+        verdict = can_register(requester)
+        if not verdict.allowed:
+            raise SignupError(verdict.reason)
 
     email = User.objects.normalize_email(email).strip()
     if not email:
@@ -96,7 +118,7 @@ def submit_application(
     # so a declined address gets an accurate message instead of a raw
     # IntegrityError from the unique constraint.
     #
-    # `blocking_for_email` decides this, and it is now load-bearing rather than
+    # `blocking_for_email` decides this, and it is load-bearing rather than
     # merely tidy: `uniq_signup_email_open` excludes REDIRECTED rows, so the
     # database will happily accept a second application for a redirected address
     # and this check is the only thing stopping a *rejected* one.
@@ -104,22 +126,18 @@ def submit_application(
     if blocking is not None:
         if blocking.status == ApprovalStatus.REJECTED:
             raise SignupError(
-                "That email address was declined previously and cannot register again. "
-                "Please contact your trainer."
+                "That email address was declined previously and cannot register "
+                "again. Please contact an administrator."
             )
         if blocking.status == ApprovalStatus.SUSPENDED:
             raise SignupError(
-                "That account is suspended. Please contact your trainer."
+                "That account is suspended. Please contact an administrator."
             )
         raise SignupError("An application for that email address already exists.")
 
     # Nothing blocking. Any earlier rows for this address are REDIRECTED -- the
-    # trainer declined but explicitly allowed another application, usually against
-    # a different trainer. That is exactly the case this is here to permit.
-    #
-    # The old pending User was deleted when the redirect was recorded (see
-    # `approval.decide`), so the check above sees no account and signup proceeds
-    # as an ordinary first-time registration against the newly chosen trainer.
+    # admin declined but explicitly allowed another application. That is exactly
+    # the case this is here to permit.
 
     try:
         with transaction.atomic():
@@ -129,31 +147,31 @@ def submit_application(
                 full_name=full_name,
                 auth_source=AuthSource.SIGNUP,
                 approval_status=ApprovalStatus.PENDING,
-                selected_trainer=selected_trainer,
+                # D45: pending means inactive, so `ModelBackend` refuses the
+                # credentials on every backend rather than relying on the login
+                # view to notice. `User.move_to` flips this back on approval.
+                is_active=False,
             )
-            trainee_role, _ = Role.objects.get_or_create(
-                slug=ROLE_TRAINEE, defaults={"name": "Trainee"}
-            )
-            RoleAssignment.objects.create(user=user, role=trainee_role)
             request = SignupRequest.objects.create(
                 email=email,
                 full_name=full_name,
-                selected_trainer=selected_trainer,
+                requested_role=role,
+                created_by=requester,
                 status=ApprovalStatus.PENDING,
                 user=user,
             )
     except IntegrityError as exc:  # lost a race against a concurrent signup
         raise SignupError("An application for that email address already exists.") from exc
 
-    # Dispatch after commit: if the transaction rolls back we must not email a
-    # trainer about a phantom application.
-    transaction.on_commit(lambda: _notify_trainer(request.pk))
+    # Dispatch after commit: if the transaction rolls back we must not email an
+    # administrator about a phantom application.
+    transaction.on_commit(lambda: _notify_admins(request.pk))
 
     return SignupResult(user=user, request=request)
 
 
-def _notify_trainer(request_pk) -> None:
+def _notify_admins(request_pk) -> None:
     """Import lazily to keep this module free of Celery at import time."""
-    from apps.accounts.tasks import notify_trainer_of_application
+    from apps.accounts.tasks import notify_admins_of_application
 
-    notify_trainer_of_application.delay(str(request_pk))
+    notify_admins_of_application.delay(str(request_pk))
